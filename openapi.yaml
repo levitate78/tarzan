@@ -1,0 +1,708 @@
+openapi: 3.1.0
+info:
+  title: Tarzan API
+  description: |
+    Team management platform aggregating GitLab and Jira data.
+    Provides team member profiles, skills matrices, work item dashboards,
+    and merge request review tracking.
+  version: 1.0.0
+  contact:
+    name: Tarzan Support
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development
+  - url: https://tarzan.internal/api/v1
+    description: Production
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ── Auth ──────────────────────────────────────────────────────────────────
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string, format: password }
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, example: bearer }
+        expires_in: { type: integer, description: Seconds until expiry }
+
+    # ── Users / Profiles ──────────────────────────────────────────────────────
+    UserRole:
+      type: string
+      enum: [admin, lead, member, viewer]
+
+    UserCreate:
+      type: object
+      required: [username, email, full_name, password]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 50 }
+        email: { type: string, format: email }
+        full_name: { type: string }
+        avatar_url: { type: string, format: uri, nullable: true }
+        gitlab_username: { type: string, nullable: true }
+        jira_username: { type: string, nullable: true }
+        role: { $ref: '#/components/schemas/UserRole' }
+        password: { type: string, format: password, minLength: 12 }
+
+    UserUpdate:
+      type: object
+      properties:
+        full_name: { type: string }
+        avatar_url: { type: string, format: uri, nullable: true }
+        gitlab_username: { type: string, nullable: true }
+        jira_username: { type: string, nullable: true }
+        role: { $ref: '#/components/schemas/UserRole' }
+
+    UserResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        email: { type: string, format: email }
+        full_name: { type: string }
+        avatar_url: { type: string, format: uri, nullable: true }
+        gitlab_username: { type: string, nullable: true }
+        jira_username: { type: string, nullable: true }
+        role: { $ref: '#/components/schemas/UserRole' }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        skill_levels: { type: array, items: { $ref: '#/components/schemas/SkillLevelResponse' } }
+
+    # ── Skills ────────────────────────────────────────────────────────────────
+    SkillCategory:
+      type: string
+      enum: [languages, frameworks, cloud, databases, devops, testing, soft_skills, other]
+
+    SkillCreate:
+      type: object
+      required: [name, category]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        category: { $ref: '#/components/schemas/SkillCategory' }
+        description: { type: string, nullable: true }
+
+    SkillResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        category: { $ref: '#/components/schemas/SkillCategory' }
+        description: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    SkillLevelSet:
+      type: object
+      required: [skill_id, level]
+      properties:
+        skill_id: { type: string, format: uuid }
+        level:
+          type: integer
+          minimum: 0
+          maximum: 5
+          description: "0=None, 1=Beginner, 2=Elementary, 3=Intermediate, 4=Advanced, 5=Expert"
+        aspiration_level:
+          type: integer
+          minimum: 0
+          maximum: 5
+          nullable: true
+
+    SkillLevelResponse:
+      type: object
+      properties:
+        skill: { $ref: '#/components/schemas/SkillResponse' }
+        level: { type: integer, minimum: 0, maximum: 5 }
+        aspiration_level: { type: integer, minimum: 0, maximum: 5, nullable: true }
+        updated_at: { type: string, format: date-time }
+
+    TeamSkillsMatrix:
+      type: object
+      description: Aggregated skill levels across the team
+      properties:
+        skill: { $ref: '#/components/schemas/SkillResponse' }
+        member_count: { type: integer }
+        average_level: { type: number, format: float }
+        gap_count:
+          type: integer
+          description: Members with aspiration_level > current level
+        distribution:
+          type: object
+          description: Count of members at each level (0-5)
+          additionalProperties: { type: integer }
+
+    # ── Jira Issues ───────────────────────────────────────────────────────────
+    IssueStatus:
+      type: string
+      enum: [todo, in_progress, in_review, blocked, done, cancelled]
+
+    IssuePriority:
+      type: string
+      enum: [critical, high, medium, low]
+
+    JiraIssueResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string, example: PROJ-123 }
+        project_key: { type: string }
+        summary: { type: string }
+        description: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/IssueStatus' }
+        priority: { $ref: '#/components/schemas/IssuePriority' }
+        issue_type: { type: string }
+        assignee: { $ref: '#/components/schemas/UserResponse', nullable: true }
+        reporter_username: { type: string }
+        labels: { type: array, items: { type: string } }
+        jira_url: { type: string, format: uri }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        synced_at: { type: string, format: date-time }
+        linked_mrs: { type: array, items: { $ref: '#/components/schemas/GitLabMRSummary' } }
+
+    IssueReassignRequest:
+      type: object
+      required: [assignee_username]
+      properties:
+        assignee_username: { type: string }
+
+    # ── GitLab Merge Requests ─────────────────────────────────────────────────
+    MRState:
+      type: string
+      enum: [opened, closed, merged, locked]
+
+    GitLabMRSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        iid: { type: integer }
+        project_name: { type: string }
+        title: { type: string }
+        state: { $ref: '#/components/schemas/MRState' }
+        web_url: { type: string, format: uri }
+        review_age_hours: { type: number }
+        breached: { type: boolean }
+
+    GitLabMRResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        iid: { type: integer }
+        project_id: { type: integer }
+        project_name: { type: string }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        state: { $ref: '#/components/schemas/MRState' }
+        author_username: { type: string }
+        assignee_usernames: { type: array, items: { type: string } }
+        reviewer_usernames: { type: array, items: { type: string } }
+        source_branch: { type: string }
+        target_branch: { type: string }
+        web_url: { type: string, format: uri }
+        jira_issue_keys: { type: array, items: { type: string } }
+        review_age_hours: { type: number, format: float }
+        breach_threshold_hours: { type: number }
+        breached: { type: boolean }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        synced_at: { type: string, format: date-time }
+        linked_issues: { type: array, items: { $ref: '#/components/schemas/JiraIssueResponse' } }
+
+    # ── Dashboard ─────────────────────────────────────────────────────────────
+    TeamDashboard:
+      type: object
+      properties:
+        total_members: { type: integer }
+        total_open_issues: { type: integer }
+        total_open_mrs: { type: integer }
+        issues_by_status:
+          type: object
+          additionalProperties: { type: integer }
+        mrs_breached: { type: integer }
+        members: { type: array, items: { $ref: '#/components/schemas/MemberSummary' } }
+
+    MemberSummary:
+      type: object
+      properties:
+        user: { $ref: '#/components/schemas/UserResponse' }
+        open_issues: { type: integer }
+        blocked_issues: { type: integer }
+        open_mrs: { type: integer }
+        breached_mrs: { type: integer }
+
+    # ── Connector Config ──────────────────────────────────────────────────────
+    ConnectorType:
+      type: string
+      enum: [jira, gitlab]
+
+    ConnectorConfigCreate:
+      type: object
+      required: [connector_type, base_url, token]
+      properties:
+        connector_type: { $ref: '#/components/schemas/ConnectorType' }
+        base_url: { type: string, format: uri }
+        token: { type: string, description: PAT or OAuth token (stored encrypted) }
+        project_keys:
+          type: array
+          items: { type: string }
+          description: Jira project keys to sync
+        project_ids:
+          type: array
+          items: { type: integer }
+          description: GitLab project IDs to sync
+        poll_interval_seconds:
+          type: integer
+          default: 300
+          minimum: 60
+
+    ConnectorConfigResponse:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        connector_type: { $ref: '#/components/schemas/ConnectorType' }
+        base_url: { type: string, format: uri }
+        project_keys: { type: array, items: { type: string } }
+        project_ids: { type: array, items: { type: integer } }
+        poll_interval_seconds: { type: integer }
+        last_synced_at: { type: string, format: date-time, nullable: true }
+        is_healthy: { type: boolean }
+        created_at: { type: string, format: date-time }
+
+    # ── Review Threshold ──────────────────────────────────────────────────────
+    ReviewThresholdUpdate:
+      type: object
+      required: [threshold_hours]
+      properties:
+        threshold_hours: { type: number, minimum: 1 }
+
+    # ── Pagination ────────────────────────────────────────────────────────────
+    PaginatedResponse:
+      type: object
+      properties:
+        total: { type: integer }
+        page: { type: integer }
+        page_size: { type: integer }
+        items: { type: array, items: {} }
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail: { type: string }
+        code: { type: string }
+
+paths:
+  # ── Auth ────────────────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Obtain JWT access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        200:
+          description: Token issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        401:
+          description: Invalid credentials
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorResponse' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user profile
+      responses:
+        200:
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+
+  # ── Users ───────────────────────────────────────────────────────────────────
+  /users:
+    get:
+      tags: [Users]
+      summary: List all team members
+      parameters:
+        - name: page; in: query; schema: { type: integer, default: 1 }
+        - name: page_size; in: query; schema: { type: integer, default: 20 }
+      responses:
+        200:
+          description: Paginated user list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/UserResponse' }
+    post:
+      tags: [Users]
+      summary: Create team member (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserCreate' }
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+
+  /users/{user_id}:
+    get:
+      tags: [Users]
+      summary: Get user profile
+      parameters:
+        - name: user_id; in: path; required: true; schema: { type: string, format: uuid }
+      responses:
+        200:
+          description: User profile with skill levels
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+    patch:
+      tags: [Users]
+      summary: Update user profile
+      parameters:
+        - name: user_id; in: path; required: true; schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserUpdate' }
+      responses:
+        200:
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+    delete:
+      tags: [Users]
+      summary: Deactivate user (admin only)
+      parameters:
+        - name: user_id; in: path; required: true; schema: { type: string, format: uuid }
+      responses:
+        204:
+          description: Deactivated
+
+  /users/{user_id}/skills:
+    put:
+      tags: [Users]
+      summary: Set skill levels for a user
+      parameters:
+        - name: user_id; in: path; required: true; schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { $ref: '#/components/schemas/SkillLevelSet' }
+      responses:
+        200:
+          description: Updated skill levels
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SkillLevelResponse' }
+
+  # ── Skills ──────────────────────────────────────────────────────────────────
+  /skills:
+    get:
+      tags: [Skills]
+      summary: List all skills
+      parameters:
+        - name: category; in: query; schema: { $ref: '#/components/schemas/SkillCategory' }
+      responses:
+        200:
+          description: Skills list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SkillResponse' }
+    post:
+      tags: [Skills]
+      summary: Create a new skill (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SkillCreate' }
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SkillResponse' }
+
+  /skills/matrix:
+    get:
+      tags: [Skills]
+      summary: Team skills matrix aggregation
+      responses:
+        200:
+          description: Matrix data
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TeamSkillsMatrix' }
+
+  /skills/{skill_id}:
+    patch:
+      tags: [Skills]
+      summary: Update skill metadata (admin only)
+      parameters:
+        - name: skill_id; in: path; required: true; schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SkillCreate' }
+      responses:
+        200:
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SkillResponse' }
+    delete:
+      tags: [Skills]
+      summary: Delete skill (admin only)
+      parameters:
+        - name: skill_id; in: path; required: true; schema: { type: string, format: uuid }
+      responses:
+        204:
+          description: Deleted
+
+  # ── Jira Issues ─────────────────────────────────────────────────────────────
+  /issues:
+    get:
+      tags: [Jira]
+      summary: List Jira issues
+      parameters:
+        - name: assignee_id; in: query; schema: { type: string, format: uuid }
+        - name: status; in: query; schema: { $ref: '#/components/schemas/IssueStatus' }
+        - name: project_key; in: query; schema: { type: string }
+        - name: page; in: query; schema: { type: integer, default: 1 }
+        - name: page_size; in: query; schema: { type: integer, default: 50 }
+      responses:
+        200:
+          description: Paginated issues
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/JiraIssueResponse' }
+
+  /issues/{issue_id}:
+    get:
+      tags: [Jira]
+      summary: Get issue detail
+      parameters:
+        - name: issue_id; in: path; required: true; schema: { type: string, format: uuid }
+      responses:
+        200:
+          description: Issue detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JiraIssueResponse' }
+
+  /issues/{issue_id}/reassign:
+    post:
+      tags: [Jira]
+      summary: Reassign issue via Jira API
+      parameters:
+        - name: issue_id; in: path; required: true; schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssueReassignRequest' }
+      responses:
+        200:
+          description: Reassigned
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/JiraIssueResponse' }
+
+  # ── GitLab MRs ──────────────────────────────────────────────────────────────
+  /merge-requests:
+    get:
+      tags: [GitLab]
+      summary: List merge requests
+      parameters:
+        - name: author; in: query; schema: { type: string }
+        - name: reviewer; in: query; schema: { type: string }
+        - name: state; in: query; schema: { $ref: '#/components/schemas/MRState' }
+        - name: breached_only; in: query; schema: { type: boolean }
+        - name: user_id; in: query; schema: { type: string, format: uuid }
+        - name: page; in: query; schema: { type: integer, default: 1 }
+        - name: page_size; in: query; schema: { type: integer, default: 50 }
+      responses:
+        200:
+          description: Paginated MRs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/GitLabMRResponse' }
+
+  /merge-requests/{mr_id}:
+    get:
+      tags: [GitLab]
+      summary: Get MR detail
+      parameters:
+        - name: mr_id; in: path; required: true; schema: { type: string, format: uuid }
+      responses:
+        200:
+          description: MR detail with linked issues
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GitLabMRResponse' }
+
+  # ── Dashboard ───────────────────────────────────────────────────────────────
+  /dashboard/team:
+    get:
+      tags: [Dashboard]
+      summary: Team-level dashboard aggregation
+      responses:
+        200:
+          description: Team dashboard
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TeamDashboard' }
+
+  /dashboard/member/{user_id}:
+    get:
+      tags: [Dashboard]
+      summary: Individual member dashboard
+      parameters:
+        - name: user_id; in: path; required: true; schema: { type: string, format: uuid }
+      responses:
+        200:
+          description: Member dashboard
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberSummary' }
+
+  # ── Config ──────────────────────────────────────────────────────────────────
+  /config/connectors:
+    get:
+      tags: [Config]
+      summary: List connector configurations (admin only)
+      responses:
+        200:
+          description: Connectors
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ConnectorConfigResponse' }
+    post:
+      tags: [Config]
+      summary: Create connector config (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConnectorConfigCreate' }
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConnectorConfigResponse' }
+
+  /config/connectors/{config_id}:
+    put:
+      tags: [Config]
+      summary: Update connector config (admin only)
+      parameters:
+        - name: config_id; in: path; required: true; schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConnectorConfigCreate' }
+      responses:
+        200:
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ConnectorConfigResponse' }
+    delete:
+      tags: [Config]
+      summary: Delete connector config (admin only)
+      parameters:
+        - name: config_id; in: path; required: true; schema: { type: string, format: uuid }
+      responses:
+        204:
+          description: Deleted
+
+  /config/review-threshold:
+    get:
+      tags: [Config]
+      summary: Get current MR review breach threshold
+      responses:
+        200:
+          description: Current threshold
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  threshold_hours: { type: number }
+    put:
+      tags: [Config]
+      summary: Update MR review breach threshold (admin/lead only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewThresholdUpdate' }
+      responses:
+        200:
+          description: Updated threshold
+
+  /config/sync:
+    post:
+      tags: [Config]
+      summary: Trigger manual sync of all connectors (admin only)
+      responses:
+        202:
+          description: Sync triggered
