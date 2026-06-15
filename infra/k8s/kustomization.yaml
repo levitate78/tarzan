@@ -1,0 +1,22 @@
+# Apply everything with:
+#   kubectl apply -k infra/k8s
+#
+# Before applying, create infra/k8s/secret.yaml (NOT committed) based on
+# secret.example.yaml with real, generated values and add it to the
+# resources list below — or manage secrets via your own pipeline (e.g.
+# External Secrets Operator, SealedSecrets, Vault).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: tarzan
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  # - secret.yaml          # <- create from secret.example.yaml, do not commit
+  - postgres.yaml
+  - redis.yaml
+  - backend.yaml
+  - worker.yaml
+  - frontend.yaml
+  - ingress.yaml

@@ -153,6 +153,11 @@ class JiraIssue(Base):
         "MRIssueLink", back_populates="issue", cascade="all, delete-orphan"
     )
 
+    @property
+    def linked_mrs(self) -> list["GitLabMR"]:
+        """Merge requests linked to this issue (via MRIssueLink)."""
+        return [link.mr for link in self.mr_links]
+
 
 # ── GitLab MRs ─────────────────────────────────────────────────────────────────
 
@@ -184,6 +189,11 @@ class GitLabMR(Base):
     issue_links: Mapped[list["MRIssueLink"]] = relationship(
         "MRIssueLink", back_populates="mr", cascade="all, delete-orphan"
     )
+
+    @property
+    def linked_issues(self) -> list["JiraIssue"]:
+        """Jira issues linked to this merge request (via MRIssueLink)."""
+        return [link.issue for link in self.issue_links]
 
 
 class MRIssueLink(Base):

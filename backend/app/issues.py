@@ -8,14 +8,17 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DB, require_role, write_audit_log
 from app.core.rbac import Role
-from app.models import ConnectorConfig, JiraIssue, User
+from app.models import ConnectorConfig, JiraIssue, MRIssueLink, User
 from app.schemas import IssueReassignRequest, JiraIssueResponse, PaginatedResponse
 
 router = APIRouter(prefix="/issues", tags=["Jira"])
 
 
 def _issue_query():
-    return select(JiraIssue).options(selectinload(JiraIssue.assignee))
+    return select(JiraIssue).options(
+        selectinload(JiraIssue.assignee),
+        selectinload(JiraIssue.mr_links).selectinload(MRIssueLink.mr),
+    )
 
 
 @router.get("", response_model=PaginatedResponse)
@@ -95,7 +98,10 @@ async def reassign_issue(
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Jira connector not configured")
 
     connector = JiraConnector(base_url=config.base_url, token=config.token)
-    await connector.reassign_issue(issue.key, body.assignee_username)
+    try:
+        await connector.reassign_issue(issue.key, body.assignee_username)
+    finally:
+        await connector.close()
 
     # Update local user mapping
     user_res = await db.execute(

@@ -48,12 +48,47 @@ limiter = Limiter(
 )
 
 
+async def _bootstrap_admin() -> None:
+    """Create an initial admin account if no users exist yet.
+
+    Controlled by ADMIN_USERNAME / ADMIN_PASSWORD / ADMIN_EMAIL env vars.
+    This only runs the very first time the application starts against an
+    empty `users` table — it is a no-op once any user has been created, so
+    it is safe to leave the variables set (or to remove them afterwards).
+    """
+    if not (settings.ADMIN_USERNAME and settings.ADMIN_PASSWORD and settings.ADMIN_EMAIL):
+        return
+
+    from sqlalchemy import select
+
+    from app.core.security import hash_password
+    from app.database import AsyncSessionLocal
+    from app.models import User
+
+    async with AsyncSessionLocal() as db:
+        existing = await db.execute(select(User.id).limit(1))
+        if existing.scalar_one_or_none():
+            return
+
+        admin = User(
+            username=settings.ADMIN_USERNAME,
+            email=settings.ADMIN_EMAIL,
+            full_name=settings.ADMIN_FULL_NAME,
+            role="admin",
+            hashed_password=hash_password(settings.ADMIN_PASSWORD),
+        )
+        db.add(admin)
+        await db.commit()
+        log.info("bootstrap_admin_created", username=settings.ADMIN_USERNAME)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log.info("tarzan_startup", version=settings.APP_VERSION, env=settings.ENVIRONMENT)
     # Create tables (Alembic handles migrations in production)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    await _bootstrap_admin()
     yield
     log.info("tarzan_shutdown")
     await engine.dispose()

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tarzan-config
+  namespace: tarzan
+data:
+  APP_NAME: "Tarzan"
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  API_V1_PREFIX: "/api/v1"
+  # Update to the public hostname(s) the frontend is served from.
+  ALLOWED_ORIGINS: '["https://tarzan.example.com"]'
+  REDIS_URL: "redis://redis:6379/0"
+  RATE_LIMIT_PER_MINUTE: "120"
+  DEFAULT_REVIEW_THRESHOLD_HOURS: "24"
+  WORKER_POLL_INTERVAL_SECONDS: "300"

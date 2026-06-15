@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tarzan
+  namespace: tarzan
+  annotations:
+    # Example for cert-manager / nginx-ingress; adjust for your cluster.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  tls:
+    - hosts:
+        - tarzan.example.com
+      secretName: tarzan-tls
+  rules:
+    - host: tarzan.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

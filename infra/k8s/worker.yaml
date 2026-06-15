@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: tarzan
+spec:
+  # Keep at 1 replica: the worker schedules its own sync jobs in-process
+  # (APScheduler) and listens on a Redis pub/sub channel for manual syncs.
+  # Running multiple replicas would duplicate scheduled syncs.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: tarzan-worker:latest
+          envFrom:
+            - configMapRef:
+                name: tarzan-config
+            - secretRef:
+                name: tarzan-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

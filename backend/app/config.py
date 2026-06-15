@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import AnyHttpUrl, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -51,6 +51,14 @@ class Settings(BaseSettings):
     # ── Worker ────────────────────────────────────────────────────────────────
     WORKER_POLL_INTERVAL_SECONDS: int = 300
 
+    # ── Initial admin bootstrap ─────────────────────────────────────────────────
+    # If set (and no users exist yet), an initial admin account is created on
+    # startup. Leave unset in production once the first admin has been created.
+    ADMIN_USERNAME: Optional[str] = None
+    ADMIN_PASSWORD: Optional[str] = None
+    ADMIN_EMAIL: Optional[str] = None
+    ADMIN_FULL_NAME: str = "Administrator"
+
     @field_validator("SECRET_KEY")
     @classmethod
     def secret_key_length(cls, v: str) -> str:
@@ -69,6 +77,13 @@ class Settings(BaseSettings):
                 raise ValueError("Decoded key must be at least 32 bytes")
         except Exception as exc:
             raise ValueError("FIELD_ENCRYPTION_KEY must be base64url-encoded") from exc
+        return v
+
+    @field_validator("ADMIN_PASSWORD")
+    @classmethod
+    def admin_password_length(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and len(v) < 12:
+            raise ValueError("ADMIN_PASSWORD must be at least 12 characters")
         return v
 
     @property

@@ -4,16 +4,19 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DB
-from app.models import GitLabMR
+from app.models import GitLabMR, MRIssueLink
 from app.schemas import GitLabMRResponse, PaginatedResponse
 
 router = APIRouter(prefix="/merge-requests", tags=["GitLab"])
 
 
 def _mr_query():
-    return select(GitLabMR)
+    return select(GitLabMR).options(
+        selectinload(GitLabMR.issue_links).selectinload(MRIssueLink.issue)
+    )
 
 
 @router.get("", response_model=PaginatedResponse)
@@ -47,7 +50,6 @@ async def list_mrs(
 
     # reviewer filter (array contains)
     if reviewer:
-        from sqlalchemy import cast, ARRAY, String
         filters.append(GitLabMR.reviewer_usernames.any(reviewer))
 
     # user_id: match author or reviewer by gitlab_username
@@ -76,7 +78,7 @@ async def list_mrs(
         .offset((page - 1) * page_size)
         .limit(page_size)
     )
-    mrs = result.scalars().all()
+    mrs = result.scalars().unique().all()
     return PaginatedResponse(
         total=total,
         page=page,

@@ -152,7 +152,7 @@ class UserSummary(OrmBase):
     role: str
 
 
-# ── Jira Issues ────────────────────────────────────────────────────────────────
+# ── GitLab Merge Requests (forward declarations) ──────────────────────────────
 
 class GitLabMRSummary(OrmBase):
     id: str
@@ -164,6 +164,8 @@ class GitLabMRSummary(OrmBase):
     review_age_hours: float
     breached: bool
 
+
+# ── Jira Issues ────────────────────────────────────────────────────────────────
 
 class JiraIssueResponse(OrmBase):
     id: str
@@ -181,13 +183,24 @@ class JiraIssueResponse(OrmBase):
     jira_created_at: Optional[datetime] = None
     jira_updated_at: Optional[datetime] = None
     synced_at: datetime
+    linked_mrs: list[GitLabMRSummary] = []
 
 
 class IssueReassignRequest(BaseModel):
     assignee_username: str
 
 
-# ── GitLab MRs ─────────────────────────────────────────────────────────────────
+# ── GitLab Merge Requests ─────────────────────────────────────────────────────
+
+class JiraIssueSummary(OrmBase):
+    id: str
+    key: str
+    project_key: str
+    summary: str
+    status: str
+    priority: Optional[str] = None
+    jira_url: Optional[str] = None
+
 
 class GitLabMRResponse(OrmBase):
     id: str
@@ -210,6 +223,7 @@ class GitLabMRResponse(OrmBase):
     mr_created_at: Optional[datetime] = None
     mr_updated_at: Optional[datetime] = None
     synced_at: datetime
+    linked_issues: list[JiraIssueSummary] = []
 
 
 # ── Dashboard ──────────────────────────────────────────────────────────────────
