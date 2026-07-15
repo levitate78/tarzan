@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ item.issue_key }}{% endblock %}
+{% block content %}
+<section>
+  <p><a href="{{ url_for('jira.index') }}">← Back to work items</a></p>
+  <article class="work-item-detail{% if item.is_blocked %} is-blocked{% endif %}{% if item.is_in_review %} is-in-review{% endif %}">
+    <h1>{{ item.issue_key }} — {{ item.summary }}</h1>
+    <p>
+      {% if item.is_blocked %}<span class="badge badge-blocked" role="status">⛔ Blocked</span>{% endif %}
+      {% if item.is_in_review %}<span class="badge badge-in-review" role="status">👀 In review</span>{% endif %}
+    </p>
+    <dl class="card-fields">
+      <div><dt>Assignee</dt><dd>{{ item.assignee_display_name or item.assignee_account_id or "Unassigned" }}</dd></div>
+      <div><dt>Status</dt><dd>{{ item.status }}</dd></div>
+      <div><dt>Priority</dt><dd>{{ item.priority or "None" }}</dd></div>
+    </dl>
+
+    <section aria-labelledby="description-heading" class="detail-section">
+      <h2 id="description-heading">Description</h2>
+      {% if item.description %}<p class="preserve-lines">{{ item.description }}</p>{% else %}<p class="empty-state">No description.</p>{% endif %}
+    </section>
+
+    <section aria-labelledby="labels-heading" class="detail-section">
+      <h2 id="labels-heading">Labels</h2>
+      {% if item.labels %}
+      <ul class="label-list">
+        {% for label in item.labels %}<li class="badge label-badge">{{ label }}</li>{% endfor %}
+      </ul>
+      {% else %}<p class="empty-state">No labels.</p>{% endif %}
+    </section>
+
+    <section aria-labelledby="linked-heading" class="detail-section">
+      <h2 id="linked-heading">Linked issues</h2>
+      {% if item.linked_issues %}
+      <ul>
+        {% for link in item.linked_issues %}
+        <li>{{ link.type }} <strong>{{ link.key }}</strong></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="empty-state">No linked issues.</p>{% endif %}
+    </section>
+
+    <section aria-labelledby="comments-heading" class="detail-section">
+      <h2 id="comments-heading">Comments</h2>
+      {% if item.comments %}
+      <ul class="comment-list">
+        {% for comment in item.comments %}
+        <li class="card comment">
+          <p class="comment-meta"><strong>{{ comment.author or "Unknown" }}</strong> <time>{{ comment.created }}</time></p>
+          <p class="preserve-lines">{{ comment.body }}</p>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="empty-state">No comments.</p>{% endif %}
+    </section>
+
+    <section aria-labelledby="reassign-heading" class="detail-section narrow-panel">
+      <h2 id="reassign-heading">Reassign</h2>
+      {% if team_members %}
+      <form method="post" action="{{ url_for('jira.reassign', issue_key=item.issue_key) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <p>
+          <label for="assignee">New assignee</label>
+          <select id="assignee" name="assignee" required>
+            {% for member in team_members %}
+            <option value="{{ member.jira_account_id or member.username }}">{{ member.name }}</option>
+            {% endfor %}
+          </select>
+        </p>
+        <p><button type="submit">Reassign work item</button></p>
+      </form>
+      {% else %}
+      <p class="empty-state">Add team members before reassigning work items.</p>
+      {% endif %}
+    </section>
+  </article>
+</section>
+{% endblock %}

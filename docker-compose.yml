@@ -1,0 +1,32 @@
+# Local deployment: `docker-compose up` (Requirement 12.1).
+# All configuration comes from the environment / a .env file — no values are
+# hardcoded in the image (Requirement 12.3). Copy .env.example to .env first.
+services:
+  tarzan:
+    build: .
+    ports:
+      - "${TARZAN_PORT:-8000}:8000"
+    environment:
+      TARZAN_DB_KEY: ${TARZAN_DB_KEY:?Set TARZAN_DB_KEY in .env}
+      TARZAN_SECRET_KEY: ${TARZAN_SECRET_KEY:?Set TARZAN_SECRET_KEY in .env}
+      TARZAN_ADMIN_USERNAME: ${TARZAN_ADMIN_USERNAME:?Set TARZAN_ADMIN_USERNAME in .env}
+      TARZAN_ADMIN_PASSWORD: ${TARZAN_ADMIN_PASSWORD:?Set TARZAN_ADMIN_PASSWORD in .env}
+      TARZAN_DATA_DIR: /data
+      TARZAN_HTTPS_ENFORCE: ${TARZAN_HTTPS_ENFORCE:-false}
+      TARZAN_LOG_LEVEL: ${TARZAN_LOG_LEVEL:-INFO}
+    volumes:
+      - tarzan-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4).status == 200 else 1)"
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  tarzan-data:

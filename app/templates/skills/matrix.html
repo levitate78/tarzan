@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Skills — {{ profile.name }}{% endblock %}
+{% block content %}
+<section>
+  <h1>Skills matrix — {{ profile.name }}</h1>
+  <p><a href="{{ url_for('profiles.detail', username=profile.username) }}">Back to profile</a></p>
+
+  {% if entries %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th scope="col">Skill</th>
+        <th scope="col">Current level</th>
+        <th scope="col">Aspiration</th>
+        <th scope="col">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in entries %}
+      <tr>
+        <td>{{ entry.skill_name }}{% if entry.skill_deprecated %} <span class="badge badge-deprecated">Deprecated</span>{% endif %}</td>
+        <td>{% with level = entry.current_level %}{% include "partials/_skill_badge.html" %}{% endwith %}</td>
+        <td>{% if entry.aspiration_level %}{% with level = entry.aspiration_level %}{% include "partials/_skill_badge.html" %}{% endwith %}{% else %}—{% endif %}</td>
+        <td>
+          <form method="post" action="{{ url_for('skills.remove_matrix_entry', username=profile.username, skill_id=entry.skill_id) }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="danger">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">No skills recorded for {{ profile.name }} yet.</p>
+  {% endif %}
+
+  <section aria-labelledby="assign-heading" class="narrow-panel">
+    <h2 id="assign-heading">Add or update a skill</h2>
+    {% if available_skills %}
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <p>
+        <label for="skill_id">Skill</label>
+        <select id="skill_id" name="skill_id" required>
+          {% for skill in available_skills %}
+          <option value="{{ skill.id }}">{{ skill.name }}{% if skill.id in assigned_ids %} (update){% endif %}</option>
+          {% endfor %}
+        </select>
+      </p>
+      <p>
+        <label for="current_level">Current proficiency level</label>
+        <select id="current_level" name="current_level" required>
+          {% for level in levels %}<option value="{{ level }}">{{ level }}</option>{% endfor %}
+        </select>
+      </p>
+      <p>
+        <label for="aspiration_level">Aspiration level (optional)</label>
+        <select id="aspiration_level" name="aspiration_level">
+          <option value="">None</option>
+          {% for level in levels %}<option value="{{ level }}">{{ level }}</option>{% endfor %}
+        </select>
+      </p>
+      <p><button type="submit">Save skill</button></p>
+    </form>
+    {% else %}
+    <p class="empty-state">
+      The skill catalogue is empty.
+      <a href="{{ url_for('skills.catalogue') }}">Add skills to the catalogue</a> first.
+    </p>
+    {% endif %}
+  </section>
+</section>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Skills dashboard{% endblock %}
+{% block content %}
+<section>
+  <h1>Team skills dashboard</h1>
+  {% if summary is none %}
+  <p class="empty-state error-state">
+    The latest skills data could not be retrieved. Any data shown elsewhere is
+    the last successfully loaded snapshot.
+  </p>
+  {% elif summary %}
+  <table class="data-table">
+    <caption>Count of team members at each proficiency level per skill</caption>
+    <thead>
+      <tr>
+        <th scope="col">Skill</th>
+        {% for level in levels %}<th scope="col">{{ level }}</th>{% endfor %}
+        <th scope="col">Aspiring higher</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in summary %}
+      <tr>
+        <td>{{ row.skill_name }}{% if row.deprecated %} <span class="badge badge-deprecated">Deprecated</span>{% endif %}</td>
+        {% for level in levels %}<td class="count-cell">{{ row.level_counts[level] }}</td>{% endfor %}
+        <td class="count-cell">{{ row.aspiration_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">
+    No skills in the catalogue yet.
+    <a href="{{ url_for('skills.catalogue') }}">Add skills to the catalogue</a> to get started.
+  </p>
+  {% endif %}
+</section>
+{% endblock %}

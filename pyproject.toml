@@ -1,0 +1,13 @@
+[project]
+name = "tarzan"
+version = "0.1.0"
+description = "Team management and visibility dashboard aggregating Jira and GitLab data"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    "ignore::DeprecationWarning:apscheduler.*",
+]

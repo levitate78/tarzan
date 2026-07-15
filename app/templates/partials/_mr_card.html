@@ -1,0 +1,35 @@
+{# Context: mr (MergeRequestDTO). Renders title, author, target branch,
+   creation date, and review status (Requirement 6.3), an overdue border when
+   older than the review threshold (Requirement 6.4), and ticket links
+   (Requirement 7). #}
+<article class="card mr-card{% if mr.overdue %} mr-overdue{% endif %}">
+  <h3 class="card-title">
+    {% if mr.web_url %}
+    <a href="{{ mr.web_url }}" rel="noopener">{{ mr.title }}</a>
+    {% else %}
+    {{ mr.title }}
+    {% endif %}
+  </h3>
+  <dl class="card-fields">
+    <div><dt>Author</dt><dd>{{ mr.author_username or "Unknown" }}</dd></div>
+    <div><dt>Target branch</dt><dd>{{ mr.target_branch or "?" }}</dd></div>
+    <div><dt>Created</dt><dd><time>{{ mr.created_at | minute }}</time></dd></div>
+    <div><dt>Review status</dt>
+      <dd><span class="badge review-status review-{{ mr.review_status | lower | replace(' ', '-') }}">{{ mr.review_status }}</span></dd>
+    </div>
+  </dl>
+  {% if mr.overdue %}
+  <span class="badge badge-overdue" role="status">⏰ Review overdue</span>
+  {% endif %}
+  {% if mr.ticket_links %}
+  <p class="ticket-links">Tickets:
+    {% for link in mr.ticket_links %}
+      {% if link.url %}
+      <a class="ticket-ref" href="{{ link.url }}" rel="noopener">{{ link.issue_key }}</a>
+      {% else %}
+      <span class="ticket-ref ticket-ref-unavailable" title="Not found in the configured Jira instance">{{ link.issue_key }}</span>
+      {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
+</article>

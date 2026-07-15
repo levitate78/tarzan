@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Work items{% endblock %}
+{% block content %}
+<section>
+  <h1>Work items</h1>
+  {% include "partials/_staleness_warning.html" %}
+
+  <form method="get" action="{{ url_for('jira.index') }}" class="filter-form">
+    <label for="assignee">Filter by assignee</label>
+    <select id="assignee" name="assignee">
+      <option value="">All team members</option>
+      {% for member in team_members %}
+      <option value="{{ member.name }}" {% if selected_assignee == member.name %}selected{% endif %}>{{ member.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Apply filter</button>
+  </form>
+
+  {% if no_data %}
+  <p class="empty-state error-state">
+    No work item data is available yet and the Jira API has not been reached.
+    Verify the API configuration in <a href="{{ url_for('settings.index') }}">Settings</a>.
+  </p>
+  {% elif items %}
+  <div class="card-list">
+    {% for item in items %}
+    {% include "partials/_work_item_card.html" %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty-state">No active work items match the current filter.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Merge requests{% endblock %}
+{% block content %}
+<section>
+  <h1>Merge requests</h1>
+  {% include "partials/_staleness_warning.html" %}
+
+  <form method="get" action="{{ url_for('gitlab.index') }}" class="filter-form">
+    <label for="member">Filter by team member (author or reviewer)</label>
+    <select id="member" name="member">
+      <option value="">Whole team</option>
+      {% for m in team_members %}
+      <option value="{{ m.gitlab_username or m.username }}" {% if selected_member == (m.gitlab_username or m.username) %}selected{% endif %}>{{ m.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Apply filter</button>
+  </form>
+
+  {% if no_data %}
+  <p class="empty-state error-state">
+    No merge request data is available yet and the GitLab API has not been
+    reached. Verify the API configuration in
+    <a href="{{ url_for('settings.index') }}">Settings</a>.
+  </p>
+  {% elif merge_requests %}
+  <div class="card-list">
+    {% for mr in merge_requests %}
+    {% include "partials/_mr_card.html" %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty-state">No open merge requests match the current filter.</p>
+  {% endif %}
+</section>
+{% endblock %}

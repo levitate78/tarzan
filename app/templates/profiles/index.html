@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Team{% endblock %}
+{% block content %}
+<section>
+  <div class="page-heading">
+    <h1>Team</h1>
+    <p><a class="button-link" href="{{ url_for('profiles.new') }}">Add team member</a></p>
+  </div>
+  {% if profiles %}
+  <ul class="profile-grid">
+    {% for profile in profiles %}
+    <li class="card profile-card">
+      {% if profile.avatar_path %}
+      <img class="avatar" src="{{ url_for('profiles.serve_avatar', username=profile.username) }}"
+           alt="Avatar of {{ profile.name[:100] }}" width="64" height="64">
+      {% else %}
+      <span class="avatar avatar-placeholder" aria-hidden="true">{{ profile.name[:1] | upper }}</span>
+      {% endif %}
+      <h2 class="card-title"><a href="{{ url_for('profiles.detail', username=profile.username) }}">{{ profile.name }}</a></h2>
+      <p class="profile-username">@{{ profile.username }}</p>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="empty-state">No team members yet. Add your first team member to get started.</p>
+  {% endif %}
+</section>
+{% endblock %}

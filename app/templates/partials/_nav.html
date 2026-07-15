@@ -1,0 +1,20 @@
+<nav aria-label="Main navigation">
+  <ul class="nav-list">
+    <li><a href="{{ url_for('jira.index') }}">Work Items</a></li>
+    <li><a href="{{ url_for('gitlab.index') }}">Merge Requests</a></li>
+    <li><a href="{{ url_for('skills.dashboard') }}">Skills Dashboard</a></li>
+    <li><a href="{{ url_for('profiles.index') }}">Team</a></li>
+    <li><a href="{{ url_for('skills.catalogue') }}">Skill Catalogue</a></li>
+    <li><a href="{{ url_for('settings.index') }}">Settings</a></li>
+    {% if current_user.is_authenticated %}
+    <li>
+      <form method="post" action="{{ url_for('auth.logout') }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="link-button">Log out</button>
+      </form>
+    </li>
+    {% else %}
+    <li><a href="{{ url_for('auth.login') }}">Log in</a></li>
+    {% endif %}
+  </ul>
+</nav>

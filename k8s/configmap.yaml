@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tarzan-config
+  labels:
+    app: tarzan
+data:
+  TARZAN_DATA_DIR: /data
+  TARZAN_HTTPS_ENFORCE: "true"
+  TARZAN_LOG_LEVEL: INFO

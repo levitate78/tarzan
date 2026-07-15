@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Tarzan{% endblock %} · Tarzan</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<a class="skip-link" href="#main-content">Skip to main content</a>
+<header class="site-header">
+  <p class="brand"><a href="{{ url_for('home.index') }}">Tarzan</a></p>
+  {% include "partials/_nav.html" %}
+</header>
+<main id="main-content">
+  {% include "partials/_flash_messages.html" %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="site-footer">
+  <p>Tarzan — team visibility dashboard</p>
+</footer>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

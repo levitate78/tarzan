@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Confirm skill removal{% endblock %}
+{% block content %}
+<section class="narrow-panel">
+  <h1>Remove '{{ skill.name }}'?</h1>
+  <p>
+    <strong>{{ reference_count }}</strong> team member(s) currently reference
+    this skill in their skills matrix. Removing it will mark the skill as
+    deprecated; existing skills matrix entries will be kept.
+  </p>
+  <form method="post" action="{{ url_for('skills.remove_skill', skill_id=skill.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="confirmed" value="1">
+    <button type="submit" class="danger">Yes, remove the skill</button>
+    <a class="button-link secondary" href="{{ url_for('skills.catalogue') }}">Cancel</a>
+  </form>
+</section>
+{% endblock %}

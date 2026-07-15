@@ -1,0 +1,26 @@
+{# Refresh metadata for a dashboard. Context: refresh_statuses is a list of
+   RefreshStatusDTO. Shows the last successful refresh per source
+   (Requirement 8.6), a stale-data indicator when older than one refresh
+   cycle (Requirement 9.3), and a staleness warning after 3+ consecutive
+   failures (Requirement 8.5). #}
+{% if refresh_statuses %}
+<section class="refresh-status" aria-label="Data freshness">
+  {% for status in refresh_statuses %}
+    <p class="refresh-meta">
+      <span class="refresh-source">{{ status.display_name }}</span>:
+      last refreshed <time>{{ status.last_success | minute }}</time>
+      {% if status.stale %}
+        <span class="badge badge-stale">Data may be out of date</span>
+      {% endif %}
+    </p>
+    {% if status.failing %}
+    <p class="staleness-warning" role="alert">
+      Data for <strong>{{ status.display_name }}</strong> ({{ status.source_id }})
+      may be out of date — the last {{ status.consecutive_failures }} refresh
+      attempts failed. Last successful refresh:
+      <time>{{ status.last_success | minute }}</time>.
+    </p>
+    {% endif %}
+  {% endfor %}
+</section>
+{% endif %}

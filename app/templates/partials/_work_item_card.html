@@ -1,0 +1,20 @@
+{# Context: item (WorkItemDTO). Renders issue key, summary, assignee, status,
+   and priority (Requirement 4.3) with distinct blocked / in-review
+   indicators (Requirements 4.4, 4.5). #}
+<article class="card work-item-card{% if item.is_blocked %} is-blocked{% endif %}{% if item.is_in_review %} is-in-review{% endif %}">
+  <h3 class="card-title">
+    <a href="{{ url_for('jira.detail', issue_key=item.issue_key) }}">{{ item.issue_key }}</a>
+    <span class="work-item-summary">{{ item.summary }}</span>
+  </h3>
+  <dl class="card-fields">
+    <div><dt>Assignee</dt><dd>{{ item.assignee_display_name or item.assignee_account_id or "Unassigned" }}</dd></div>
+    <div><dt>Status</dt><dd>{{ item.status }}</dd></div>
+    <div><dt>Priority</dt><dd>{{ item.priority or "None" }}</dd></div>
+  </dl>
+  {% if item.is_blocked %}
+  <span class="badge badge-blocked" role="status">⛔ Blocked</span>
+  {% endif %}
+  {% if item.is_in_review %}
+  <span class="badge badge-in-review" role="status">👀 In review</span>
+  {% endif %}
+</article>

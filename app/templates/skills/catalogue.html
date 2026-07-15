@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Skill catalogue{% endblock %}
+{% block content %}
+<section>
+  <h1>Skill catalogue</h1>
+  <form method="post" action="{{ url_for('skills.add_skill') }}" class="inline-add-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="name">New skill name</label>
+    <input type="text" id="name" name="name" required>
+    <button type="submit">Add skill</button>
+  </form>
+  {% if skills %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th scope="col">Skill</th>
+        <th scope="col">Team members using it</th>
+        <th scope="col">Status</th>
+        <th scope="col">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for skill in skills %}
+      <tr>
+        <td>{{ skill.name }}</td>
+        <td>{{ reference_counts[skill.id] }}</td>
+        <td>{% if skill.deprecated %}<span class="badge badge-deprecated">Deprecated</span>{% else %}Active{% endif %}</td>
+        <td>
+          <form method="post" action="{{ url_for('skills.remove_skill', skill_id=skill.id) }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="danger">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">The catalogue is empty. Add the first skill above.</p>
+  {% endif %}
+</section>
+{% endblock %}

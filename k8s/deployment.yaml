@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tarzan
+  labels:
+    app: tarzan
+spec:
+  # SQLite-backed storage: run a single replica.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: tarzan
+  template:
+    metadata:
+      labels:
+        app: tarzan
+    spec:
+      containers:
+        - name: tarzan
+          image: tarzan:latest
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: tarzan-config
+            - secretRef:
+                name: tarzan-secrets
+          volumeMounts:
+            - name: tarzan-data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi
+      volumes:
+        - name: tarzan-data
+          persistentVolumeClaim:
+            claimName: tarzan-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tarzan-data
+  labels:
+    app: tarzan
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

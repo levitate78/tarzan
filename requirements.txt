@@ -1,0 +1,28 @@
+# Core web framework
+flask>=3.0,<4
+Flask-Login>=0.6,<0.7
+itsdangerous>=2.1
+
+# Persistence
+SQLAlchemy>=2.0,<3
+alembic>=1.13,<2
+# SQLCipher bindings: the manylinux wheel bundles SQLCipher (used in the Docker
+# image / Kubernetes). On platforms without a wheel the application can only
+# start with TARZAN_ALLOW_UNENCRYPTED_DB=true (development only).
+sqlcipher3-binary>=0.5; platform_system == "Linux"
+
+# Background refresh
+APScheduler>=3.10,<4
+
+# External API clients
+python-gitlab>=4.0
+jira>=3.6
+
+# Security
+cryptography>=42.0
+
+# Logging
+python-json-logger>=2.0
+
+# Serving (production)
+gunicorn>=21.0; platform_system != "Windows"

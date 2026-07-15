@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<section>
+  <h1>Settings</h1>
+
+  <section aria-labelledby="api-heading" class="settings-section">
+    <h2 id="api-heading">API credentials</h2>
+    <form method="post" action="{{ url_for('settings.update_credentials') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <p>
+        <label for="jira_url">Jira base URL</label>
+        <input type="url" id="jira_url" name="jira_url" value="{{ jira_url }}" placeholder="https://jira.example.com">
+      </p>
+      <p>
+        <label for="jira_token">Jira API token {% if jira_token_set %}(currently set — leave blank to keep){% endif %}</label>
+        <input type="password" id="jira_token" name="jira_token" autocomplete="off">
+      </p>
+      <p>
+        <label for="gitlab_url">GitLab base URL</label>
+        <input type="url" id="gitlab_url" name="gitlab_url" value="{{ gitlab_url }}" placeholder="https://gitlab.example.com">
+      </p>
+      <p>
+        <label for="gitlab_token">GitLab API token {% if gitlab_token_set %}(currently set — leave blank to keep){% endif %}</label>
+        <input type="password" id="gitlab_token" name="gitlab_token" autocomplete="off">
+      </p>
+      <p><button type="submit">Save API settings</button></p>
+    </form>
+  </section>
+
+  <section aria-labelledby="refresh-heading" class="settings-section">
+    <h2 id="refresh-heading">Background refresh</h2>
+    <form method="post" action="{{ url_for('settings.update_refresh_interval') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <p>
+        <label for="refresh_interval">Refresh interval in minutes (1–60)</label>
+        <input type="number" id="refresh_interval" name="refresh_interval" min="1" max="60" value="{{ refresh_interval }}" required>
+      </p>
+      <p><button type="submit">Save interval</button></p>
+    </form>
+  </section>
+
+  <section aria-labelledby="threshold-heading" class="settings-section">
+    <h2 id="threshold-heading">Review threshold</h2>
+    <form method="post" action="{{ url_for('settings.update_review_threshold') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <p>
+        <label for="review_threshold">Days before an open merge request is overdue for review (1–30)</label>
+        <input type="number" id="review_threshold" name="review_threshold" min="1" max="30" value="{{ review_threshold }}" required>
+      </p>
+      <p><button type="submit">Save threshold</button></p>
+    </form>
+  </section>
+
+  <section aria-labelledby="jira-projects-heading" class="settings-section">
+    <h2 id="jira-projects-heading">Jira projects</h2>
+    {% if jira_projects %}
+    <table class="data-table">
+      <thead><tr><th scope="col">Key</th><th scope="col">Name</th><th scope="col">Enabled</th><th scope="col">Actions</th></tr></thead>
+      <tbody>
+        {% for project in jira_projects %}
+        <tr>
+          <td>{{ project.project_key }}</td>
+          <td>{{ project.display_name }}</td>
+          <td>{{ "Yes" if project.enabled else "No" }}</td>
+          <td>
+            <form method="post" action="{{ url_for('settings.remove_jira_project', project_id=project.id) }}" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="danger">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No Jira projects configured yet.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('settings.add_jira_project') }}" class="inline-add-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="project_key">Project key</label>
+      <input type="text" id="project_key" name="project_key" required placeholder="PROJ">
+      <label for="jira_display_name">Display name</label>
+      <input type="text" id="jira_display_name" name="display_name">
+      <button type="submit">Add Jira project</button>
+    </form>
+  </section>
+
+  <section aria-labelledby="gitlab-projects-heading" class="settings-section">
+    <h2 id="gitlab-projects-heading">GitLab projects</h2>
+    {% if gitlab_projects %}
+    <table class="data-table">
+      <thead><tr><th scope="col">Project ID</th><th scope="col">Name</th><th scope="col">Enabled</th><th scope="col">Actions</th></tr></thead>
+      <tbody>
+        {% for project in gitlab_projects %}
+        <tr>
+          <td>{{ project.gitlab_project_id }}</td>
+          <td>{{ project.display_name }}</td>
+          <td>{{ "Yes" if project.enabled else "No" }}</td>
+          <td>
+            <form method="post" action="{{ url_for('settings.remove_gitlab_project', project_id=project.id) }}" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="danger">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">No GitLab projects configured yet.</p>
+    {% endif %}
+    <form method="post" action="{{ url_for('settings.add_gitlab_project') }}" class="inline-add-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <label for="gitlab_project_id">Project ID</label>
+      <input type="text" id="gitlab_project_id" name="gitlab_project_id" required inputmode="numeric" placeholder="12345">
+      <label for="gitlab_display_name">Display name</label>
+      <input type="text" id="gitlab_display_name" name="display_name">
+      <button type="submit">Add GitLab project</button>
+    </form>
+  </section>
+</section>
+{% endblock %}
