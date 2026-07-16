@@ -85,3 +85,33 @@ def test_rendered_html_escapes_user_input(value):
         assert "&gt;" in inner
     if "&" in value:
         assert "&amp;" in inner
+
+
+# Feature: team-dashboard, Property 39: Password change round-trip
+@given(
+    new_password=st.text(min_size=8, max_size=64),
+    other_password=st.text(min_size=1, max_size=64),
+)
+@settings(max_examples=100)
+def test_password_change_round_trip(new_password, other_password):
+    from unittest.mock import patch
+
+    from werkzeug.security import check_password_hash, generate_password_hash
+
+    from app.services.config_service import ConfigService
+
+    service = ConfigService(make_memory_session())
+    # A low-iteration hash keeps 100 examples fast; verification semantics
+    # are identical to the production default.
+    with patch(
+        "app.services.config_service.generate_password_hash",
+        lambda password: generate_password_hash(password, method="pbkdf2:sha256:1000"),
+    ):
+        service.set_admin_password(new_password)
+
+    stored = service.get_admin_password_hash()
+    assert stored is not None
+    assert new_password not in stored  # hash never contains the plaintext
+    assert check_password_hash(stored, new_password)
+    if other_password != new_password:
+        assert not check_password_hash(stored, other_password)

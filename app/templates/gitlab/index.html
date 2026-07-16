@@ -5,6 +5,11 @@
   <h1>Merge requests</h1>
   {% include "partials/_staleness_warning.html" %}
 
+  <form method="post" action="{{ url_for('gitlab.refresh') }}" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Refresh GitLab data now</button>
+  </form>
+
   <form method="get" action="{{ url_for('gitlab.index') }}" class="filter-form">
     <label for="member">Filter by team member (author or reviewer)</label>
     <select id="member" name="member">

@@ -94,12 +94,16 @@ Each Blueprint owns a URL prefix and a small set of route functions. Route funct
 
 | Blueprint | Prefix | Responsibilities |
 |---|---|---|
-| `auth_bp` | `/auth` | Login, logout, session management |
+| `auth_bp` | `/auth` | Login, logout, session management, change password |
 | `profiles_bp` | `/profiles` | Team member profile CRUD |
 | `skills_bp` | `/skills` | Skill catalogue management, skills dashboard |
-| `jira_bp` | `/jira` | Work items dashboard, detail view, reassignment |
-| `gitlab_bp` | `/gitlab` | Merge requests dashboard |
+| `jira_bp` | `/jira` | Work items dashboard, detail view, reassignment, manual refresh |
+| `gitlab_bp` | `/gitlab` | Merge requests dashboard, manual refresh |
 | `settings_bp` | `/settings` | Configuration: API credentials, thresholds, intervals |
+
+**Manual refresh (Requirement 14)**: `POST /jira/refresh` and `POST /gitlab/refresh` are explicit user actions (like reassignment) that call the same `fetch_and_cache()` service path the Background_Updater uses, for every enabled project of that source, then redirect back to the dashboard with a summary flash. Dashboard page renders remain cache-only (Requirement 9.5). When the source's URL/token is not configured the route flashes an error pointing at Settings without recording refresh failures.
+
+**Change password (Requirement 15)**: `GET/POST /auth/change-password` verifies the current password, validates the new password (≥ 8 characters, matching confirmation), and stores a salted hash in the `CONFIG` table inside the SQLCipher-encrypted database. Login prefers the stored hash over the hash derived from `TARZAN_ADMIN_PASSWORD`, so the change applies immediately and survives restarts. All other `USER_SESSION` rows for the manager are deleted on change (server-side invalidation), keeping only the session that made the change.
 
 ### 3. Service Layer (`app/services/`)
 
@@ -667,6 +671,16 @@ The same property holds for the SQLCipher database file: for any record written 
 
 ---
 
+### Property 39: Password change round-trip
+
+*For any* new password value, storing it via the password-change flow must persist a hash from which the original password verifies (`check_password_hash` returns True), any other password is rejected, and the stored hash string does not contain the plaintext password. The stored hash must take precedence over the environment-derived hash at login.
+
+Manual refresh (Requirement 14) introduces no new cache semantics: it reuses `fetch_and_cache()`, whose round-trip and failure-retention behaviour is already covered by Properties 11 and 12; the routes themselves are covered by unit tests.
+
+**Validates: Requirements 15.2, 15.3**
+
+---
+
 ## Error Handling
 
 ### Strategy
@@ -789,6 +803,7 @@ The following correctness properties map directly to property tests:
 | 36 Bulk import round-trip | `test_skills_properties.py` | `st.dictionaries()` of member/skill pairs → levels, rendered to CSV |
 | 37 Bulk import atomicity | `test_skills_properties.py` | Valid rows + one invalid row (sampled failure kind) |
 | 38 Missing-skill creation gated | `test_skills_properties.py` | Unknown skill names, imported with flag off then on |
+| 39 Password change round-trip | `test_security_properties.py` | `st.text()` password pairs, hash verification both ways |
 
 ### Unit Tests
 

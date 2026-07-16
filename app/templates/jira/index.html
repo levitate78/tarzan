@@ -5,6 +5,11 @@
   <h1>Work items</h1>
   {% include "partials/_staleness_warning.html" %}
 
+  <form method="post" action="{{ url_for('jira.refresh') }}" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Refresh Jira data now</button>
+  </form>
+
   <form method="get" action="{{ url_for('jira.index') }}" class="filter-form">
     <label for="assignee">Filter by assignee</label>
     <select id="assignee" name="assignee">

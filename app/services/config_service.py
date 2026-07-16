@@ -4,8 +4,10 @@ review threshold, external instance URLs, status mappings)."""
 from __future__ import annotations
 
 from sqlalchemy.orm import Session
+from werkzeug.security import generate_password_hash
 
 from app.constants import (
+    CONFIG_ADMIN_PASSWORD_HASH,
     CONFIG_GITLAB_URL,
     CONFIG_IN_REVIEW_STATUSES,
     CONFIG_JIRA_URL,
@@ -70,6 +72,15 @@ class ConfigService:
 
     def set_gitlab_url(self, value: str) -> None:
         self.set_value(CONFIG_GITLAB_URL, value.strip().rstrip("/"))
+
+    def get_admin_password_hash(self) -> str | None:
+        """The UI-set password hash, taking precedence over the environment
+        password at login (Requirement 15.3). The hash lives in the CONFIG
+        table inside the encrypted database; the plaintext is never stored."""
+        return self.get_value(CONFIG_ADMIN_PASSWORD_HASH)
+
+    def set_admin_password(self, new_password: str) -> None:
+        self.set_value(CONFIG_ADMIN_PASSWORD_HASH, generate_password_hash(new_password))
 
     def get_in_review_statuses(self) -> set[str]:
         raw = self.get_value(CONFIG_IN_REVIEW_STATUSES, DEFAULT_IN_REVIEW_STATUSES) or ""

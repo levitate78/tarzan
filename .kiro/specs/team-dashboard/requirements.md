@@ -227,3 +227,33 @@ Tarzan is a team management and visibility web application that aggregates data 
 7. IF the same username and skill combination appears in more than one row of the file, THEN THE Application SHALL report a validation error identifying both row numbers.
 8. IF the uploaded file exceeds 1 MB, is not valid UTF-8 text, or does not contain the required header columns, THEN THE Application SHALL reject the import and display a descriptive error.
 9. THE Application SHALL restrict bulk import to authenticated Team_Manager users.
+
+---
+
+### Requirement 14: Manual Data Refresh
+
+**User Story:** As a Team_Manager, I want to trigger an immediate refresh of Jira and GitLab data from the dashboards, so that I can pull in the latest state on demand without waiting for the next Background_Updater cycle.
+
+#### Acceptance Criteria
+
+1. THE Application SHALL provide a manual refresh control on the Work_Items Dashboard (refreshing all enabled Jira projects) and on the Merge_Requests Dashboard (refreshing all enabled GitLab projects), available only to authenticated Team_Manager users.
+2. WHEN a Team_Manager triggers a manual refresh, THE Application SHALL fetch data for every enabled project of the corresponding source, update the Cache, and record each project's refresh outcome exactly as a Background_Updater cycle would.
+3. WHEN a manual refresh completes, THE Application SHALL display a summary including the number of projects refreshed and items fetched, and SHALL identify any project whose refresh failed.
+4. IF the corresponding API URL or token is not configured, THEN THE Application SHALL display an error directing the Team_Manager to the Settings page and SHALL NOT record refresh failures against the configured projects.
+5. IF a manual refresh fails for a project, THEN THE Application SHALL retain the existing cached data for that project unchanged (consistent with Requirements 4.2 and 6.2).
+6. THE manual refresh SHALL run only in response to the explicit refresh action; dashboard page renders SHALL continue to make no synchronous external API calls (Requirement 9.5).
+
+---
+
+### Requirement 15: Password Management
+
+**User Story:** As a Team_Manager, I want to change my password from the UI, so that I can rotate my credentials without editing environment variables and restarting the Application.
+
+#### Acceptance Criteria
+
+1. THE Application SHALL provide a change-password page for the authenticated Team_Manager that requires the current password, a new password, and a confirmation of the new password.
+2. WHEN the submitted current password is correct, the new password is at least 8 characters long, and the confirmation matches the new password, THE Application SHALL store a salted hash of the new password in the encrypted database and apply it to subsequent logins immediately, without an application restart.
+3. WHILE a stored password hash exists, THE Application SHALL use it for login verification in place of the TARZAN_ADMIN_PASSWORD environment value.
+4. IF the current password is incorrect, the new password is shorter than 8 characters, or the confirmation does not match, THEN THE Application SHALL reject the change with a descriptive error, leave the existing password unchanged, and never echo any submitted password value.
+5. WHEN the password is changed, THE Application SHALL invalidate all other active sessions for the Team_Manager server-side, keeping only the session that made the change.
+6. THE Application SHALL never write submitted or stored password values to log output (per Requirement 10.2).

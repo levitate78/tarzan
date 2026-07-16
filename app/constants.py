@@ -33,6 +33,10 @@ CONFIG_REVIEW_THRESHOLD = "review_threshold_days"
 CONFIG_JIRA_URL = "jira_url"
 CONFIG_GITLAB_URL = "gitlab_url"
 CONFIG_IN_REVIEW_STATUSES = "in_review_statuses"
+CONFIG_ADMIN_PASSWORD_HASH = "admin_password_hash"
+
+# Minimum length for a manager password set via the UI (Requirement 15.2).
+MIN_PASSWORD_LENGTH = 8
 
 DEFAULT_REFRESH_INTERVAL_MINUTES = 15  # Requirement 8.1
 DEFAULT_REVIEW_THRESHOLD_DAYS = 2  # Requirement 6.6
