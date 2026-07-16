@@ -40,16 +40,35 @@ def _validate_issue_key(issue_key: str) -> str:
 @jira_bp.get("/")
 @login_required
 def index():
-    assignee = request.args.get("assignee", "").strip() or None
+    """Work items dashboard. The assignee filter takes a team member's
+    Tarzan username and resolves it to their configured Jira account ID
+    (falling back to display name when none is set); raw account IDs or
+    display names in old URLs keep working unchanged (Requirement 4.9)."""
+    raw_filter = request.args.get("assignee", "").strip() or None
+    filter_value = raw_filter
+    selected_username = None
+    filter_notice = None
+    if raw_filter:
+        profile = profile_service().get_profile(raw_filter)
+        if profile is not None:
+            selected_username = profile.username
+            filter_value = profile.jira_account_id or profile.name
+            if not profile.jira_account_id:
+                filter_notice = (
+                    f"{profile.name} has no Jira account ID configured, so "
+                    "work items are matched by display name. Set the Jira "
+                    "account ID on their profile for exact matching."
+                )
     service = jira_service()
-    items = service.list_work_items(assignee=assignee)
+    items = service.list_work_items(assignee=filter_value)
     statuses = jira_refresh_statuses()
     no_data = service.cache_is_empty() and not any(s.last_success for s in statuses)
     return render_template(
         "jira/index.html",
         items=items,
         team_members=profile_service().list_profiles(),
-        selected_assignee=assignee,
+        selected_assignee=selected_username,
+        filter_notice=filter_notice,
         refresh_statuses=statuses,
         no_data=no_data,
     )

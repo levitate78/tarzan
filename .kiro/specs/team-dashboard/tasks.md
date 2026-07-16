@@ -386,6 +386,14 @@ Implement Tarzan as a Flask 3.x server-rendered web application with SQLCipher-e
     - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5_
 
 
+- [x] 25. Member filter resolution by configured external identity
+  - [x] 25.1 Make the application username the canonical filter parameter on the work items and merge requests dashboards: dropdown options submit `username`, the blueprint resolves the profile and passes its Jira account ID (fallback: display name) or GitLab username (fallback: application username) to the unchanged service-level matching; render a dashboard notice when a fallback is in use; pass unresolved filter values through unchanged so old URLs keep working
+    - Update the profile form label to say the Jira account ID is used for filtering as well as reassignment
+    - _Requirements: 4.9, 6.7_
+  - [x] 25.2 Write unit tests: filtering by username matches items by the configured account ID / GitLab username, fallback notice appears only when the identity field is unset, legacy raw filter values still match, dropdown options carry usernames
+    - _Requirements: 4.9, 6.7_
+
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for a faster MVP; core implementation tasks must not be skipped.

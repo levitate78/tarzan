@@ -24,16 +24,35 @@ gitlab_bp = Blueprint("gitlab", __name__)
 @gitlab_bp.get("/")
 @login_required
 def index():
-    member = request.args.get("member", "").strip() or None
+    """Merge requests dashboard. The member filter takes a team member's
+    Tarzan username and resolves it to their configured GitLab username
+    (falling back to the Tarzan username when none is set); raw GitLab
+    usernames in old URLs keep working unchanged (Requirement 6.7)."""
+    raw_filter = request.args.get("member", "").strip() or None
+    filter_value = raw_filter
+    selected_username = None
+    filter_notice = None
+    if raw_filter:
+        profile = profile_service().get_profile(raw_filter)
+        if profile is not None:
+            selected_username = profile.username
+            filter_value = profile.gitlab_username or profile.username
+            if not profile.gitlab_username:
+                filter_notice = (
+                    f"{profile.name} has no GitLab username configured, so "
+                    "merge requests are matched by their Tarzan username. Set "
+                    "the GitLab username on their profile for exact matching."
+                )
     service = gitlab_service()
-    merge_requests = service.list_merge_requests(author_or_reviewer=member)
+    merge_requests = service.list_merge_requests(author_or_reviewer=filter_value)
     statuses = gitlab_refresh_statuses()
     no_data = service.cache_is_empty() and not any(s.last_success for s in statuses)
     return render_template(
         "gitlab/index.html",
         merge_requests=merge_requests,
         team_members=profile_service().list_profiles(),
-        selected_member=member,
+        selected_member=selected_username,
+        filter_notice=filter_notice,
         refresh_statuses=statuses,
         no_data=no_data,
     )

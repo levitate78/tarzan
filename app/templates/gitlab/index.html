@@ -15,11 +15,14 @@
     <select id="member" name="member">
       <option value="">Whole team</option>
       {% for m in team_members %}
-      <option value="{{ m.gitlab_username or m.username }}" {% if selected_member == (m.gitlab_username or m.username) %}selected{% endif %}>{{ m.name }}</option>
+      <option value="{{ m.username }}" {% if selected_member == m.username %}selected{% endif %}>{{ m.name }}</option>
       {% endfor %}
     </select>
     <button type="submit">Apply filter</button>
   </form>
+  {% if filter_notice %}
+  <p class="filter-notice">{{ filter_notice }}</p>
+  {% endif %}
 
   {% if no_data %}
   <p class="empty-state error-state">

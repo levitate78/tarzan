@@ -88,6 +88,7 @@ Tarzan is a team management and visibility web application that aggregates data 
 6. THE Application SHALL provide a Work_Items Dashboard showing all active Work_Items (those not in Done, Closed, or Cancelled status) for the team, filterable by assignee.
 7. WHEN a Team_Manager selects an individual Work_Item, THE Application SHALL display the full Work_Item detail view, including description, comments, labels, and linked issues.
 8. IF the Work_Item detail view fails to load, THEN THE Application SHALL display an error message indicating the failure and preserve the current Dashboard state without navigating away.
+9. WHEN a Team_Manager filters the Work_Items Dashboard by a Team_Member, THE Application SHALL match Work_Items using the Team_Member's configured Jira account ID; IF the Team_Member has no Jira account ID configured, THEN THE Application SHALL fall back to matching by the Team_Member's display name and indicate on the Dashboard that the fallback is in use.
 
 ---
 
@@ -118,6 +119,7 @@ Tarzan is a team management and visibility web application that aggregates data 
 4. WHEN a cached Merge_Request has been open longer than the configured Review_Threshold, THE Application SHALL display a coloured border or badge on that Merge_Request on the Merge_Requests Dashboard and individual Team_Member Dashboard views.
 5. THE Application SHALL provide a Merge_Requests Dashboard showing all open Merge_Requests; WHEN a Team_Member filter is applied, THE Application SHALL display only Merge_Requests where the selected Team_Member is the author or a reviewer; WHEN no filter is applied, THE Application SHALL display all open Merge_Requests for the whole team.
 6. THE Application SHALL provide a configurable Review_Threshold expressed in whole days, with a valid range of 1 to 30 days and a default value of 2 days, editable by authenticated Team_Manager users.
+7. WHEN a Team_Manager filters the Merge_Requests Dashboard by a Team_Member, THE Application SHALL match Merge_Requests using the Team_Member's configured GitLab username; IF the Team_Member has no GitLab username configured, THEN THE Application SHALL fall back to matching by the Team_Member's application username and indicate on the Dashboard that the fallback is in use.
 
 ---
 

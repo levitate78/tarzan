@@ -15,11 +15,14 @@
     <select id="assignee" name="assignee">
       <option value="">All team members</option>
       {% for member in team_members %}
-      <option value="{{ member.name }}" {% if selected_assignee == member.name %}selected{% endif %}>{{ member.name }}</option>
+      <option value="{{ member.username }}" {% if selected_assignee == member.username %}selected{% endif %}>{{ member.name }}</option>
       {% endfor %}
     </select>
     <button type="submit">Apply filter</button>
   </form>
+  {% if filter_notice %}
+  <p class="filter-notice">{{ filter_notice }}</p>
+  {% endif %}
 
   {% if no_data %}
   <p class="empty-state error-state">
