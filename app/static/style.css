@@ -242,6 +242,12 @@ button.danger { background: var(--color-error); }
 .label-list { list-style: none; display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0; }
 .comment-list { list-style: none; padding: 0; }
 .comment-meta { color: var(--color-muted); font-size: 0.85rem; margin: 0 0 0.3rem; }
+.form-hint { color: var(--color-muted); font-size: 0.85rem; }
+.skill-badge { background: var(--color-info-bg); color: var(--color-info); }
+.ticket-skill-list li { display: flex; align-items: center; gap: 0.4rem; }
+.linked-mr-list { list-style: none; padding: 0; }
+.linked-mr-list li { margin-bottom: 0.4rem; }
+.mr-meta { color: var(--color-muted); font-size: 0.85rem; }
 
 @media (max-width: 40rem) {
   .card-fields { flex-direction: column; }

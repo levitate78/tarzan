@@ -13,6 +13,12 @@
       <div><dt>Assignee</dt><dd>{{ item.assignee_display_name or item.assignee_account_id or "Unassigned" }}</dd></div>
       <div><dt>Status</dt><dd>{{ item.status }}</dd></div>
       <div><dt>Priority</dt><dd>{{ item.priority or "None" }}</dd></div>
+      {% if item.issue_type %}<div><dt>Type</dt><dd>{{ item.issue_type }}</dd></div>{% endif %}
+      {% if item.parent_epic_key %}
+      <div><dt>Parent epic</dt><dd><a href="{{ url_for('jira.index', epic=item.parent_epic_key) }}">{{ item.parent_epic_key }}</a></dd></div>
+      {% endif %}
+      {% if item.components %}<div><dt>Components</dt><dd>{{ item.components | join(", ") }}</dd></div>{% endif %}
+      {% if item.fix_versions %}<div><dt>Fix versions</dt><dd>{{ item.fix_versions | join(", ") }}</dd></div>{% endif %}
     </dl>
 
     <section aria-labelledby="description-heading" class="detail-section">
@@ -38,6 +44,56 @@
         {% endfor %}
       </ul>
       {% else %}<p class="empty-state">No linked issues.</p>{% endif %}
+    </section>
+
+    <section aria-labelledby="merge-requests-heading" class="detail-section">
+      <h2 id="merge-requests-heading">Merge requests</h2>
+      {% if linked_merge_requests %}
+      <ul class="linked-mr-list">
+        {% for mr in linked_merge_requests %}
+        <li>
+          {% if mr.web_url %}
+          <a href="{{ mr.web_url }}" rel="noopener">{{ mr.title }}</a>
+          {% else %}
+          {{ mr.title }}
+          {% endif %}
+          <span class="badge review-status review-{{ mr.review_status | lower | replace(' ', '-') }}">{{ mr.review_status }}</span>
+          <span class="mr-meta">by {{ mr.author_username or "Unknown" }} → {{ mr.target_branch or "?" }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="empty-state">No merge requests reference this work item.</p>{% endif %}
+    </section>
+
+    <section aria-labelledby="skills-heading" class="detail-section">
+      <h2 id="skills-heading">Skills</h2>
+      {% if ticket_skills %}
+      <ul class="label-list ticket-skill-list">
+        {% for skill in ticket_skills %}
+        <li>
+          <span class="badge skill-badge">{{ skill.name }}</span>
+          <form method="post" action="{{ url_for('jira.remove_ticket_skill', issue_key=item.issue_key, skill_id=skill.id) }}" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="danger" aria-label="Remove skill {{ skill.name }}">Remove</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="empty-state">No skills linked to this work item.</p>{% endif %}
+      {% if skill_catalogue %}
+      <form method="post" action="{{ url_for('jira.add_ticket_skill', issue_key=item.issue_key) }}" class="inline-add-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label for="skill_id">Link a skill</label>
+        <select id="skill_id" name="skill_id" required>
+          {% for skill in skill_catalogue %}
+          <option value="{{ skill.id }}">{{ skill.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Link skill</button>
+      </form>
+      {% else %}
+      <p class="empty-state">Add skills to the <a href="{{ url_for('skills.catalogue') }}">catalogue</a> to link them to work items.</p>
+      {% endif %}
     </section>
 
     <section aria-labelledby="comments-heading" class="detail-section">

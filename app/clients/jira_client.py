@@ -13,7 +13,10 @@ from app.exceptions import JiraClientError
 
 logger = logging.getLogger(__name__)
 
-_SEARCH_FIELDS = "summary,assignee,status,priority,description,labels,issuelinks,comment"
+_SEARCH_FIELDS = (
+    "summary,assignee,status,priority,description,labels,issuelinks,comment,"
+    "issuetype,parent,components,fixVersions"
+)
 _PAGE_SIZE = 50
 
 
@@ -96,6 +99,28 @@ class JiraClient:
             elif hasattr(link, "outwardIssue"):
                 direction = getattr(getattr(link, "type", None), "outward", "") or link_type
                 linked.append({"key": link.outwardIssue.key, "type": direction})
+        issue_type = getattr(fields, "issuetype", None)
+        # The `parent` field carries the epic for issues in team-managed
+        # projects (and the parent story for sub-tasks); only epic parents
+        # are recorded.
+        parent = getattr(fields, "parent", None)
+        parent_epic_key = None
+        if parent is not None:
+            parent_type = getattr(
+                getattr(getattr(parent, "fields", None), "issuetype", None), "name", ""
+            )
+            if (parent_type or "").strip().lower() == "epic":
+                parent_epic_key = getattr(parent, "key", None)
+        components = [
+            name
+            for component in getattr(fields, "components", []) or []
+            if (name := getattr(component, "name", "") or "")
+        ]
+        fix_versions = [
+            name
+            for version in getattr(fields, "fixVersions", []) or []
+            if (name := getattr(version, "name", "") or "")
+        ]
         return {
             "key": issue.key,
             "summary": getattr(fields, "summary", "") or "",
@@ -104,6 +129,10 @@ class JiraClient:
             "assignee_display_name": getattr(assignee, "displayName", None),
             "status": getattr(status, "name", "") or "",
             "priority": getattr(priority, "name", None),
+            "issue_type": getattr(issue_type, "name", None),
+            "parent_epic_key": parent_epic_key,
+            "components": components,
+            "fix_versions": fix_versions,
             "description": getattr(fields, "description", "") or "",
             "labels": list(getattr(fields, "labels", []) or []),
             "comments": comments,

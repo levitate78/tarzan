@@ -85,10 +85,16 @@ class WorkItem(Base):
     assignee_display_name: Mapped[str | None] = mapped_column(String(200))
     status: Mapped[str] = mapped_column(String(100), nullable=False, default="")
     priority: Mapped[str | None] = mapped_column(String(100))
+    issue_type: Mapped[str | None] = mapped_column(String(100))
+    parent_epic_key: Mapped[str | None] = mapped_column(String(50))
+    components_json: Mapped[str | None] = mapped_column(Text)
+    fix_versions_json: Mapped[str | None] = mapped_column(Text)
     description_json: Mapped[str | None] = mapped_column(Text)
     labels_json: Mapped[str | None] = mapped_column(Text)
     linked_issues_json: Mapped[str | None] = mapped_column(Text)
     comments_json: Mapped[str | None] = mapped_column(Text)
+    # When the item first appeared blocked in the cache; cleared on unblock.
+    blocked_since: Mapped[datetime | None] = mapped_column(DateTime)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 
@@ -126,12 +132,30 @@ class TicketLink(Base):
     merge_request: Mapped[MergeRequest] = relationship(back_populates="ticket_links")
 
 
+class WorkItemSkill(Base):
+    """A skill from the catalogue linked to a Jira work item. Keyed by issue
+    key (like TicketLink) so links survive cache refreshes that recreate
+    work item rows."""
+
+    __tablename__ = "work_item_skill"
+    __table_args__ = (UniqueConstraint("issue_key", "skill_id", name="uq_issue_skill"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    issue_key: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    skill_id: Mapped[int] = mapped_column(ForeignKey("skill.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    skill: Mapped[Skill] = relationship()
+
+
 class JiraProject(Base):
     __tablename__ = "jira_project"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     project_key: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     display_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    # JSON list of component names restricting the fetch; NULL/empty = all.
+    components_json: Mapped[str | None] = mapped_column(Text)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
 

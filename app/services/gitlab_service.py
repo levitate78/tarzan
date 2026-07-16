@@ -57,6 +57,18 @@ class GitLabService:
             result.append(self._to_dto(mr))
         return result
 
+    def list_merge_requests_for_issue(self, issue_key: str) -> list[MergeRequestDTO]:
+        """Cached merge requests whose ticket links reference the given work
+        item — the ticket-side view of the Jira–GitLab linking."""
+        merge_requests = self._session.execute(
+            select(MergeRequest)
+            .join(TicketLink, TicketLink.mr_id == MergeRequest.id)
+            .where(TicketLink.issue_key == issue_key.strip().upper())
+            .options(joinedload(MergeRequest.ticket_links))
+            .order_by(MergeRequest.created_at.desc())
+        ).unique().scalars()
+        return [self._to_dto(mr) for mr in merge_requests]
+
     def cache_is_empty(self) -> bool:
         return self._session.execute(select(func.count(MergeRequest.id))).scalar_one() == 0
 

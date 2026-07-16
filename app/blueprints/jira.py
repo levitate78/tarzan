@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime
 
 from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
 from flask_login import login_required
@@ -11,9 +12,11 @@ from flask_login import login_required
 from app.blueprints.common import (
     build_jira_client,
     enabled_jira_projects,
+    gitlab_service,
     jira_refresh_statuses,
     jira_service,
     profile_service,
+    skills_service,
 )
 from app.exceptions import (
     JiraClientError,
@@ -37,30 +40,51 @@ def _validate_issue_key(issue_key: str) -> str:
     return issue_key
 
 
+def _resolve_assignee_filter():
+    """Resolve the assignee query parameter (a team member's Tarzan
+    username) to their configured Jira account ID, falling back to display
+    name when none is set; raw account IDs or display names in old URLs
+    keep working unchanged (Requirement 4.9).
+
+    Returns ``(filter_value, selected_username, notice)``."""
+    raw_filter = request.args.get("assignee", "").strip() or None
+    if not raw_filter:
+        return None, None, None
+    profile = profile_service().get_profile(raw_filter)
+    if profile is None:
+        return raw_filter, None, None
+    notice = None
+    if not profile.jira_account_id:
+        notice = (
+            f"{profile.name} has no Jira account ID configured, so "
+            "work items are matched by display name. Set the Jira "
+            "account ID on their profile for exact matching."
+        )
+    return profile.jira_account_id or profile.name, profile.username, notice
+
+
+def _selected_filters() -> dict[str, str | None]:
+    """The status/component/epic filter query parameters, normalised."""
+    return {
+        name: request.args.get(name, "").strip() or None
+        for name in ("status", "component", "epic")
+    }
+
+
 @jira_bp.get("/")
 @login_required
 def index():
-    """Work items dashboard. The assignee filter takes a team member's
-    Tarzan username and resolves it to their configured Jira account ID
-    (falling back to display name when none is set); raw account IDs or
-    display names in old URLs keep working unchanged (Requirement 4.9)."""
-    raw_filter = request.args.get("assignee", "").strip() or None
-    filter_value = raw_filter
-    selected_username = None
-    filter_notice = None
-    if raw_filter:
-        profile = profile_service().get_profile(raw_filter)
-        if profile is not None:
-            selected_username = profile.username
-            filter_value = profile.jira_account_id or profile.name
-            if not profile.jira_account_id:
-                filter_notice = (
-                    f"{profile.name} has no Jira account ID configured, so "
-                    "work items are matched by display name. Set the Jira "
-                    "account ID on their profile for exact matching."
-                )
+    """Work items dashboard, filterable by assignee, status, component, and
+    parent epic."""
+    filter_value, selected_username, filter_notice = _resolve_assignee_filter()
+    filters = _selected_filters()
     service = jira_service()
-    items = service.list_work_items(assignee=filter_value)
+    items = service.list_work_items(
+        assignee=filter_value,
+        status=filters["status"],
+        component=filters["component"],
+        epic=filters["epic"],
+    )
     statuses = jira_refresh_statuses()
     no_data = service.cache_is_empty() and not any(s.last_success for s in statuses)
     return render_template(
@@ -68,7 +92,62 @@ def index():
         items=items,
         team_members=profile_service().list_profiles(),
         selected_assignee=selected_username,
+        filters=filters,
+        filter_options=service.list_filter_options(),
         filter_notice=filter_notice,
+        refresh_statuses=statuses,
+        no_data=no_data,
+    )
+
+
+@jira_bp.get("/blocked")
+@login_required
+def blocked():
+    """Blocked work items dashboard: every blocked ticket with how long it
+    has been blocked and its priority, filterable by assignee, component,
+    and parent epic."""
+    filter_value, selected_username, filter_notice = _resolve_assignee_filter()
+    filters = _selected_filters()
+    service = jira_service()
+    items = service.list_work_items(
+        assignee=filter_value,
+        component=filters["component"],
+        epic=filters["epic"],
+        blocked_only=True,
+    )
+    # Longest-blocked first; items without a recorded start go last.
+    items.sort(key=lambda item: item.blocked_since or datetime.max)
+    statuses = jira_refresh_statuses()
+    no_data = service.cache_is_empty() and not any(s.last_success for s in statuses)
+    return render_template(
+        "jira/blocked.html",
+        items=items,
+        team_members=profile_service().list_profiles(),
+        selected_assignee=selected_username,
+        filters=filters,
+        filter_options=service.list_filter_options(),
+        filter_notice=filter_notice,
+        refresh_statuses=statuses,
+        no_data=no_data,
+    )
+
+
+@jira_bp.get("/epics")
+@login_required
+def epics():
+    """Epics dashboard: active epics from the configured Jira project
+    filters, with progress over their child items, filterable by fix
+    version."""
+    fix_version = request.args.get("fix_version", "").strip() or None
+    service = jira_service()
+    epic_list = service.list_epics(fix_version=fix_version)
+    statuses = jira_refresh_statuses()
+    no_data = service.cache_is_empty() and not any(s.last_success for s in statuses)
+    return render_template(
+        "jira/epics.html",
+        epics=epic_list,
+        fix_versions=service.list_fix_versions(),
+        selected_fix_version=fix_version,
         refresh_statuses=statuses,
         no_data=no_data,
     )
@@ -133,9 +212,45 @@ def detail(issue_key: str):
     if item is None:
         flash("That work item is not in the cache.", "error")
         return redirect(url_for("jira.index"))
+    skills = skills_service()
     return render_template(
-        "jira/detail.html", item=item, team_members=profile_service().list_profiles()
+        "jira/detail.html",
+        item=item,
+        team_members=profile_service().list_profiles(),
+        linked_merge_requests=gitlab_service().list_merge_requests_for_issue(issue_key),
+        ticket_skills=skills.list_ticket_skills(issue_key),
+        skill_catalogue=skills.list_catalogue(include_deprecated=False),
     )
+
+
+@jira_bp.post("/<issue_key>/skills")
+@login_required
+def add_ticket_skill(issue_key: str):
+    _validate_issue_key(issue_key)
+    raw_skill_id = request.form.get("skill_id", "").strip()
+    if not raw_skill_id.isdigit():
+        flash("Choose a skill from the catalogue to link.", "error")
+        return redirect(url_for("jira.detail", issue_key=issue_key))
+    try:
+        skill = skills_service().assign_ticket_skill(issue_key, int(raw_skill_id))
+    except (NotFoundError, StorageError) as exc:
+        flash(str(exc), "error")
+    else:
+        flash(f"Linked skill {skill.name} to {issue_key}.", "success")
+    return redirect(url_for("jira.detail", issue_key=issue_key))
+
+
+@jira_bp.post("/<issue_key>/skills/<int:skill_id>/remove")
+@login_required
+def remove_ticket_skill(issue_key: str, skill_id: int):
+    _validate_issue_key(issue_key)
+    try:
+        skill = skills_service().remove_ticket_skill(issue_key, skill_id)
+    except (NotFoundError, StorageError) as exc:
+        flash(str(exc), "error")
+    else:
+        flash(f"Removed skill {skill.name} from {issue_key}.", "success")
+    return redirect(url_for("jira.detail", issue_key=issue_key))
 
 
 @jira_bp.post("/<issue_key>/reassign")

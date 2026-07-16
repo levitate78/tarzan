@@ -89,6 +89,11 @@ class WorkItemDTO:
     is_blocked: bool = False
     is_in_review: bool = False
     fetched_at: datetime | None = None
+    issue_type: str | None = None
+    parent_epic_key: str | None = None
+    components: tuple = ()
+    fix_versions: tuple = ()
+    blocked_since: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -105,6 +110,35 @@ class WorkItemDetailDTO:
     linked_issues: tuple = ()
     is_blocked: bool = False
     is_in_review: bool = False
+    issue_type: str | None = None
+    parent_epic_key: str | None = None
+    components: tuple = ()
+    fix_versions: tuple = ()
+
+
+@dataclass(frozen=True)
+class WorkItemFilterOptions:
+    """Distinct values available for the work item dashboard filters, drawn
+    from the cached work items."""
+
+    statuses: tuple = ()
+    components: tuple = ()
+    epics: tuple = ()  # (issue_key, summary-or-None) pairs
+
+
+@dataclass(frozen=True)
+class EpicDTO:
+    """An epic being worked on, with progress over its cached child items."""
+
+    issue_key: str
+    summary: str
+    status: str
+    priority: str | None
+    assignee_display_name: str | None = None
+    fix_versions: tuple = ()
+    child_total: int = 0
+    child_done: int = 0
+    child_blocked: int = 0
 
 
 @dataclass(frozen=True)

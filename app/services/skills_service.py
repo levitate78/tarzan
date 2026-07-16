@@ -25,7 +25,7 @@ from app.dtos import (
     SkillSummaryDTO,
 )
 from app.exceptions import ConflictError, NotFoundError, StorageError, ValidationError
-from app.models import Skill, SkillsMatrix, TeamMember
+from app.models import Skill, SkillsMatrix, TeamMember, WorkItem, WorkItemSkill
 
 # Canonical level lookup for case-insensitive matching of CSV values.
 _LEVELS_BY_CASEFOLD: dict[str, str] = {level.casefold(): level for level in LEVELS}
@@ -160,6 +160,61 @@ class SkillsService:
             raise NotFoundError("That skill is not in this team member's skills matrix.")
         self._session.delete(entry)
         self._commit()
+
+    # -- Work item skills ----------------------------------------------------
+
+    def list_ticket_skills(self, issue_key: str) -> list[SkillDTO]:
+        """Skills linked to a Jira work item, ordered by name."""
+        links = self._session.execute(
+            select(WorkItemSkill)
+            .options(joinedload(WorkItemSkill.skill))
+            .where(WorkItemSkill.issue_key == issue_key.strip().upper())
+        ).scalars()
+        return sorted(
+            (_skill_dto(link.skill) for link in links),
+            key=lambda skill: skill.name.lower(),
+        )
+
+    def assign_ticket_skill(self, issue_key: str, skill_id: int) -> SkillDTO:
+        """Link a catalogue skill to a cached work item. Idempotent: linking
+        an already-linked skill is a no-op."""
+        key = issue_key.strip().upper()
+        if not self._work_item_exists(key):
+            raise NotFoundError("That work item is not in the cache.")
+        skill = self._session.get(Skill, skill_id)
+        if skill is None:
+            raise NotFoundError("That skill does not exist in the catalogue.")
+        existing = self._session.execute(
+            select(WorkItemSkill).where(
+                WorkItemSkill.issue_key == key, WorkItemSkill.skill_id == skill_id
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            self._session.add(WorkItemSkill(issue_key=key, skill_id=skill_id))
+            self._commit()
+        return _skill_dto(skill)
+
+    def remove_ticket_skill(self, issue_key: str, skill_id: int) -> SkillDTO:
+        key = issue_key.strip().upper()
+        link = self._session.execute(
+            select(WorkItemSkill)
+            .options(joinedload(WorkItemSkill.skill))
+            .where(WorkItemSkill.issue_key == key, WorkItemSkill.skill_id == skill_id)
+        ).scalar_one_or_none()
+        if link is None:
+            raise NotFoundError("That skill is not linked to this work item.")
+        skill = _skill_dto(link.skill)
+        self._session.delete(link)
+        self._commit()
+        return skill
+
+    def _work_item_exists(self, issue_key: str) -> bool:
+        return (
+            self._session.execute(
+                select(WorkItem.id).where(WorkItem.issue_key == issue_key)
+            ).scalar_one_or_none()
+            is not None
+        )
 
     # -- Team summary (Requirement 3) ---------------------------------------
 
