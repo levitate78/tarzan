@@ -1,16 +1,34 @@
-"""Skill catalogue, skills matrix, and team skills summary
-(Requirements 2 and 3)."""
+"""Skill catalogue, skills matrix, team skills summary, and bulk import
+(Requirements 2, 3, and 13)."""
 
 from __future__ import annotations
+
+import csv
+import io
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
-from app.constants import LEVEL_ORDER, LEVELS
-from app.dtos import MatrixEntryDTO, RemovalResult, SkillDTO, SkillSummaryDTO
+from app.constants import (
+    LEVEL_ORDER,
+    LEVELS,
+    SKILLS_IMPORT_OPTIONAL_COLUMNS,
+    SKILLS_IMPORT_REQUIRED_COLUMNS,
+)
+from app.dtos import (
+    ImportRowError,
+    MatrixEntryDTO,
+    RemovalResult,
+    SkillDTO,
+    SkillsImportResult,
+    SkillSummaryDTO,
+)
 from app.exceptions import ConflictError, NotFoundError, StorageError, ValidationError
 from app.models import Skill, SkillsMatrix, TeamMember
+
+# Canonical level lookup for case-insensitive matching of CSV values.
+_LEVELS_BY_CASEFOLD: dict[str, str] = {level.casefold(): level for level in LEVELS}
 
 
 def _skill_dto(skill: Skill) -> SkillDTO:
@@ -181,6 +199,184 @@ class SkillsService:
                 )
             )
         return summaries
+
+    # -- Bulk import (Requirement 13) ----------------------------------------
+
+    def import_matrix_csv(
+        self, csv_text: str, create_missing_skills: bool = False
+    ) -> SkillsImportResult:
+        """Import skills matrix entries from CSV text, atomically.
+
+        Every row is validated first; if any row fails, nothing is imported
+        and the result carries one ``ImportRowError`` per failing row
+        (Requirement 13.3). Valid rows create or update matrix entries
+        exactly as ``assign_skill`` would, in a single commit. With
+        ``create_missing_skills`` set, skills not in the catalogue are added
+        as part of the same import (Requirement 13.4).
+        """
+        rows = self._parse_import_csv(csv_text)
+
+        members_by_username = {
+            member.username.casefold(): member
+            for member in self._session.execute(select(TeamMember)).scalars()
+        }
+        skills_by_name = {
+            skill.name.casefold(): skill
+            for skill in self._session.execute(select(Skill)).scalars()
+        }
+
+        errors: list[ImportRowError] = []
+        assignments: list[tuple[TeamMember, str, str, str | None]] = []
+        pending_skills: dict[str, str] = {}  # casefolded name -> catalogue name
+        seen_pairs: dict[tuple[str, str], int] = {}  # (username, skill) -> row number
+
+        for row_number, cells in rows:
+            username = cells.get("username", "")
+            skill_name = cells.get("skill", "")
+            row_errors = []
+
+            member = members_by_username.get(username.casefold())
+            if not username:
+                row_errors.append(("username", "the username is missing."))
+            elif member is None:
+                row_errors.append(
+                    ("username", "no team member has this username.")
+                )
+
+            skill_key = skill_name.casefold()
+            if not skill_name:
+                row_errors.append(("skill", "the skill name is missing."))
+            elif skill_key not in skills_by_name and skill_key not in pending_skills:
+                if create_missing_skills:
+                    pending_skills[skill_key] = skill_name
+                else:
+                    row_errors.append(
+                        (
+                            "skill",
+                            "this skill is not in the catalogue; add it first "
+                            "or tick 'create missing skills'.",
+                        )
+                    )
+
+            current = self._match_level(cells.get("current_level", ""))
+            if current is None:
+                row_errors.append(
+                    (
+                        "current_level",
+                        f"the current proficiency level must be one of: {', '.join(LEVELS)}.",
+                    )
+                )
+
+            aspiration_raw = cells.get("aspiration_level", "")
+            aspiration = self._match_level(aspiration_raw) if aspiration_raw else None
+            if aspiration_raw and aspiration is None:
+                row_errors.append(
+                    (
+                        "aspiration_level",
+                        f"the aspiration level must be one of: {', '.join(LEVELS)} (or empty).",
+                    )
+                )
+
+            pair = (username.casefold(), skill_key)
+            if not row_errors:
+                if pair in seen_pairs:
+                    row_errors.append(
+                        (
+                            "username",
+                            "this team member and skill combination already "
+                            f"appears at row {seen_pairs[pair]}.",
+                        )
+                    )
+                else:
+                    seen_pairs[pair] = row_number
+
+            if row_errors:
+                errors.extend(
+                    ImportRowError(row_number=row_number, field=field, message=message)
+                    for field, message in row_errors
+                )
+            else:
+                assignments.append((member, skill_key, current, aspiration))
+
+        if errors:
+            return SkillsImportResult(errors=tuple(sorted(errors, key=lambda e: e.row_number)))
+
+        for skill_key, name in pending_skills.items():
+            skill = Skill(name=name)
+            self._session.add(skill)
+            skills_by_name[skill_key] = skill
+        if pending_skills:
+            self._session.flush()
+
+        for member, skill_key, current, aspiration in assignments:
+            skill = skills_by_name[skill_key]
+            entry = self._session.execute(
+                select(SkillsMatrix).where(
+                    SkillsMatrix.member_id == member.id,
+                    SkillsMatrix.skill_id == skill.id,
+                )
+            ).scalar_one_or_none()
+            if entry is None:
+                entry = SkillsMatrix(member_id=member.id, skill_id=skill.id)
+                self._session.add(entry)
+            entry.current_level = current
+            entry.aspiration_level = aspiration
+        self._commit()
+
+        return SkillsImportResult(
+            imported_count=len(assignments),
+            member_count=len({member.id for member, *_ in assignments}),
+            created_skills=tuple(pending_skills.values()),
+        )
+
+    def _parse_import_csv(self, csv_text: str) -> list[tuple[int, dict[str, str]]]:
+        """Parse the data rows of an import CSV.
+
+        Returns ``(row_number, {column: stripped value})`` pairs, with fully
+        blank rows skipped. Raises ``ValidationError`` for file-level
+        problems (Requirement 13.8): empty file, malformed CSV, missing
+        required columns, or duplicate columns.
+        """
+        try:
+            raw_rows = list(csv.reader(io.StringIO(csv_text)))
+        except csv.Error as exc:
+            raise ValidationError("The file is not a readable CSV file.") from exc
+        if not raw_rows:
+            raise ValidationError("The file is empty.")
+
+        known_columns = SKILLS_IMPORT_REQUIRED_COLUMNS + SKILLS_IMPORT_OPTIONAL_COLUMNS
+        header: dict[str, int] = {}
+        for index, cell in enumerate(raw_rows[0]):
+            name = cell.strip().casefold()
+            if name in known_columns:
+                if name in header:
+                    raise ValidationError(
+                        f"The header names the '{name}' column more than once."
+                    )
+                header[name] = index
+        missing = [column for column in SKILLS_IMPORT_REQUIRED_COLUMNS if column not in header]
+        if missing:
+            raise ValidationError(
+                "The header row must name the columns: "
+                f"{', '.join(SKILLS_IMPORT_REQUIRED_COLUMNS)} "
+                f"(missing: {', '.join(missing)})."
+            )
+
+        rows: list[tuple[int, dict[str, str]]] = []
+        for row_number, raw in enumerate(raw_rows[1:], start=2):
+            if not any(cell.strip() for cell in raw):
+                continue
+            cells = {
+                column: (raw[index].strip() if index < len(raw) else "")
+                for column, index in header.items()
+            }
+            rows.append((row_number, cells))
+        return rows
+
+    @staticmethod
+    def _match_level(value: str) -> str | None:
+        """Canonical proficiency level for a CSV value, or None."""
+        return _LEVELS_BY_CASEFOLD.get(value.strip().casefold())
 
     # -- Internals ---------------------------------------------------------
 

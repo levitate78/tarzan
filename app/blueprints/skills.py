@@ -9,7 +9,7 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import login_required
 
 from app.blueprints.common import profile_service, skills_service
-from app.constants import LEVELS
+from app.constants import LEVELS, MAX_SKILLS_IMPORT_BYTES
 from app.exceptions import ConflictError, NotFoundError, StorageError, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -82,6 +82,67 @@ def dashboard():
         flash("Could not load the latest skills data. Please try again.", "error")
         summary = None
     return render_template("skills/dashboard.html", summary=summary, levels=LEVELS)
+
+
+@skills_bp.route("/import", methods=["GET", "POST"])
+@login_required
+def import_matrix():
+    """Bulk import skills matrix entries from an uploaded CSV file
+    (Requirement 13). The import is atomic: on any row error, nothing is
+    imported and the errors are listed for correction."""
+    result = None
+    if request.method == "POST":
+        csv_text = _read_import_upload()
+        if csv_text is not None:
+            create_missing = request.form.get("create_missing_skills") == "1"
+            try:
+                result = skills_service().import_matrix_csv(
+                    csv_text, create_missing_skills=create_missing
+                )
+            except (ValidationError, StorageError) as exc:
+                flash(str(exc), "error")
+            else:
+                if result.ok:
+                    message = (
+                        f"Imported {result.imported_count} skill assignment(s) "
+                        f"for {result.member_count} team member(s)."
+                    )
+                    if result.created_skills:
+                        message += (
+                            f" Added {len(result.created_skills)} new skill(s) "
+                            "to the catalogue."
+                        )
+                    flash(message, "success")
+                    return redirect(url_for("skills.dashboard"))
+                flash(
+                    "Nothing was imported. Fix the rows listed below and "
+                    "upload the file again.",
+                    "error",
+                )
+    return render_template("skills/import.html", result=result, levels=LEVELS)
+
+
+def _read_import_upload() -> str | None:
+    """The uploaded CSV as text, or None (with a flashed error) when the
+    upload is missing, too large, or not UTF-8 (Requirement 13.8)."""
+    upload = request.files.get("file")
+    if upload is None or not upload.filename:
+        flash("Choose a CSV file to import.", "error")
+        return None
+    data = upload.read(MAX_SKILLS_IMPORT_BYTES + 1)
+    if len(data) > MAX_SKILLS_IMPORT_BYTES:
+        flash(
+            "The file is too large; the limit is "
+            f"{MAX_SKILLS_IMPORT_BYTES // (1024 * 1024)} MB.",
+            "error",
+        )
+        return None
+    try:
+        # utf-8-sig transparently drops the BOM that spreadsheet exports add.
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        flash("The file must be UTF-8 encoded text.", "error")
+        return None
 
 
 @skills_bp.route("/matrix/<username>", methods=["GET", "POST"])

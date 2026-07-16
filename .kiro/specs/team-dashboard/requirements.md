@@ -209,3 +209,21 @@ Tarzan is a team management and visibility web application that aggregates data 
 3. THE Application SHALL externalise all environment-specific configuration (API endpoints, credentials, thresholds) through environment variables or mounted configuration files, with no hardcoded values in the image.
 4. WHEN the Application starts, THE Application SHALL validate that all required configuration values are present and log a descriptive error indicating which value is missing, then exit with a non-zero exit code.
 5. THE Application SHALL produce structured JSON log lines on stdout, where each line includes at minimum the fields: timestamp (ISO 8601), severity, and message.
+
+---
+
+### Requirement 13: Bulk Skills Import
+
+**User Story:** As a Team_Manager, I want to bulk import Skills_Matrix entries for my Team_Members from a CSV file, so that I can populate or update the whole team's skills data in one step instead of entering each skill by hand.
+
+#### Acceptance Criteria
+
+1. THE Application SHALL provide a bulk import page where an authenticated Team_Manager can upload a CSV file of Skills_Matrix entries with a header row naming the columns `username`, `skill`, `current_level`, and optionally `aspiration_level` (column order and header case insensitive).
+2. WHEN a Team_Manager uploads a CSV file in which every row is valid, THE Application SHALL create or update the Skills_Matrix entry for each row and display a summary including the number of entries imported and the number of Team_Members affected.
+3. THE Application SHALL apply a bulk import atomically: IF any row fails validation, THEN THE Application SHALL import no rows, leave the Skills_Matrix and Skill_Catalogue unchanged, and display each failing row's number, field, and reason without echoing the invalid value.
+4. WHEN the Team_Manager selects the "create missing skills" option, THE Application SHALL add skills referenced in the CSV that are not in the Skill_Catalogue (case-insensitive match) to the Skill_Catalogue as part of the same import; IF the option is not selected, THEN each row referencing an unknown skill SHALL be reported as a validation error.
+5. IF a row references a username that does not match an existing Team_Member (case-insensitive), THEN THE Application SHALL report a validation error for that row.
+6. IF a row's proficiency or aspiration level does not match one of the defined levels (Beginner, Intermediate, Advanced, Expert; case-insensitive), THEN THE Application SHALL report a validation error for that row indicating the valid levels.
+7. IF the same username and skill combination appears in more than one row of the file, THEN THE Application SHALL report a validation error identifying both row numbers.
+8. IF the uploaded file exceeds 1 MB, is not valid UTF-8 text, or does not contain the required header columns, THEN THE Application SHALL reject the import and display a descriptive error.
+9. THE Application SHALL restrict bulk import to authenticated Team_Manager users.

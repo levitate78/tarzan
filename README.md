@@ -20,7 +20,10 @@ The full specification lives in `.kiro/specs/team-dashboard/`
   Jira/GitLab identity mapping.
 - **Skills matrix** — shared skill catalogue; per-member current proficiency
   and aspiration levels (Beginner/Intermediate/Advanced/Expert); team-wide
-  skills dashboard with per-level counts and growth aspirations.
+  skills dashboard with per-level counts and growth aspirations; bulk CSV
+  import (`username,skill,current_level,aspiration_level`) that applies
+  atomically, reports per-row errors, and can optionally create missing
+  catalogue skills.
 - **Work items dashboard** — cached Jira issues with blocked and in-review
   indicators, assignee filtering, full detail view (description, comments,
   labels, linked issues), and in-app reassignment.

@@ -19,6 +19,11 @@ ALLOWED_AVATAR_MIME_TYPES: dict[str, str] = {
 }
 MAX_AVATAR_BYTES: int = 5 * 1024 * 1024  # 5 MiB
 
+# Bulk skills import constraints (Requirement 13).
+MAX_SKILLS_IMPORT_BYTES: int = 1024 * 1024  # 1 MiB
+SKILLS_IMPORT_REQUIRED_COLUMNS: tuple[str, ...] = ("username", "skill", "current_level")
+SKILLS_IMPORT_OPTIONAL_COLUMNS: tuple[str, ...] = ("aspiration_level",)
+
 # Merge request review statuses (Requirement 6.3).
 REVIEW_STATUSES: tuple[str, ...] = ("Awaiting Review", "Changes Requested", "Approved")
 

@@ -350,6 +350,20 @@ Implement Tarzan as a Flask 3.x server-rendered web application with SQLCipher-e
   - Ensure all unit tests, property tests, smoke tests, and integration tests pass; run linting; verify no obvious regressions, ask the user if questions arise.
 
 
+- [x] 22. Bulk skills CSV import
+  - [x] 22.1 Implement `SkillsService.import_matrix_csv(csv_text, create_missing_skills=False)` returning `SkillsImportResult`
+    - Parse a header row (`username`, `skill`, `current_level`, optional `aspiration_level`; case/order insensitive); validate every row (existing username case-insensitive, skill in catalogue unless `create_missing_skills`, levels case-insensitive against the defined set, no duplicate username–skill pairs); apply atomically in a single commit or import nothing and return per-row errors that never echo the invalid value
+    - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7_
+  - [x] 22.2 Implement `GET/POST /skills/import` in `skills_bp` and `app/templates/skills/import.html`
+    - Enforce `@login_required` and CSRF; reject uploads over 1 MB or not valid UTF-8; render the format description, the create-missing-skills option, per-row errors, and a success summary; link the page from the skills dashboard and catalogue
+    - _Requirements: 13.1, 13.2, 13.8, 13.9_
+  - [x]* 22.3 Write property tests for bulk import
+    - **Property 36: Bulk import round-trip**, **Property 37: Bulk import atomicity**, **Property 38: Missing-skill creation is gated by the option**
+    - **Validates: Requirements 13.2, 13.3, 13.4, 13.5, 13.6, 13.7**
+  - [x] 22.4 Write unit tests covering header handling, row validation errors, update-vs-create semantics, and the upload routes (auth, CSRF, size/encoding rejection)
+    - _Requirements: 13.1, 13.3, 13.8, 13.9_
+
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for a faster MVP; core implementation tasks must not be skipped.
