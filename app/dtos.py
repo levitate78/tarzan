@@ -45,6 +45,31 @@ class SkillSummaryDTO:
 
 
 @dataclass(frozen=True)
+class ImportRowError:
+    """One failed row of a bulk skills import. The message describes the
+    problem without echoing the invalid value (Requirement 10.3)."""
+
+    row_number: int
+    field: str
+    message: str
+
+
+@dataclass(frozen=True)
+class SkillsImportResult:
+    """Outcome of a bulk skills import. Imports are atomic: either every row
+    was applied (``errors`` is empty) or nothing was (Requirement 13.3)."""
+
+    imported_count: int = 0
+    member_count: int = 0
+    created_skills: tuple = ()
+    errors: tuple = ()
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
+
+
+@dataclass(frozen=True)
 class RemovalResult:
     skill_id: int
     skill_name: str

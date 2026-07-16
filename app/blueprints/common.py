@@ -6,6 +6,7 @@ from __future__ import annotations
 from flask import current_app
 from sqlalchemy import select
 
+from app.constants import CREDENTIAL_GITLAB_TOKEN, CREDENTIAL_JIRA_TOKEN
 from app.db import get_session
 from app.dtos import RefreshStatusDTO
 from app.models import GitLabProject, JiraProject
@@ -51,14 +52,40 @@ def jira_service(client=None) -> JiraService:
     )
 
 
-def gitlab_service() -> GitLabService:
+def gitlab_service(client=None) -> GitLabService:
     cfg = config_service()
     return GitLabService(
         get_session(),
         cache_service=cache_service(),
+        client=client,
         jira_url=cfg.get_jira_url(),
         review_threshold_days=cfg.get_review_threshold_days(),
     )
+
+
+def build_jira_client():
+    """A JiraClient for an explicit user action (reassignment, manual
+    refresh) — dashboard reads never touch the external API. Returns None
+    when the URL or token is not configured."""
+    url = config_service().get_jira_url()
+    token = credential_service().get_credential(CREDENTIAL_JIRA_TOKEN)
+    if not url or not token:
+        return None
+    from app.clients.jira_client import JiraClient
+
+    return JiraClient(server=url, token=token)
+
+
+def build_gitlab_client():
+    """A GitLabClient for an explicit user action (manual refresh). Returns
+    None when the URL or token is not configured."""
+    url = config_service().get_gitlab_url()
+    token = credential_service().get_credential(CREDENTIAL_GITLAB_TOKEN)
+    if not url or not token:
+        return None
+    from app.clients.gitlab_client import GitLabClient
+
+    return GitLabClient(url=url, token=token)
 
 
 def enabled_jira_projects() -> list[JiraProject]:

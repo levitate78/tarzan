@@ -350,6 +350,50 @@ Implement Tarzan as a Flask 3.x server-rendered web application with SQLCipher-e
   - Ensure all unit tests, property tests, smoke tests, and integration tests pass; run linting; verify no obvious regressions, ask the user if questions arise.
 
 
+- [x] 22. Bulk skills CSV import
+  - [x] 22.1 Implement `SkillsService.import_matrix_csv(csv_text, create_missing_skills=False)` returning `SkillsImportResult`
+    - Parse a header row (`username`, `skill`, `current_level`, optional `aspiration_level`; case/order insensitive); validate every row (existing username case-insensitive, skill in catalogue unless `create_missing_skills`, levels case-insensitive against the defined set, no duplicate username–skill pairs); apply atomically in a single commit or import nothing and return per-row errors that never echo the invalid value
+    - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7_
+  - [x] 22.2 Implement `GET/POST /skills/import` in `skills_bp` and `app/templates/skills/import.html`
+    - Enforce `@login_required` and CSRF; reject uploads over 1 MB or not valid UTF-8; render the format description, the create-missing-skills option, per-row errors, and a success summary; link the page from the skills dashboard and catalogue
+    - _Requirements: 13.1, 13.2, 13.8, 13.9_
+  - [x]* 22.3 Write property tests for bulk import
+    - **Property 36: Bulk import round-trip**, **Property 37: Bulk import atomicity**, **Property 38: Missing-skill creation is gated by the option**
+    - **Validates: Requirements 13.2, 13.3, 13.4, 13.5, 13.6, 13.7**
+  - [x] 22.4 Write unit tests covering header handling, row validation errors, update-vs-create semantics, and the upload routes (auth, CSRF, size/encoding rejection)
+    - _Requirements: 13.1, 13.3, 13.8, 13.9_
+
+
+- [x] 23. Manual data refresh
+  - [x] 23.1 Add shared request-scoped client builders (`build_jira_client`, `build_gitlab_client`) to `app/blueprints/common.py` and reuse them for reassignment and manual refresh
+    - _Requirements: 14.2_
+  - [x] 23.2 Implement `POST /jira/refresh` and `POST /gitlab/refresh`: for every enabled project call the same `fetch_and_cache()` path the scheduler uses, flash a summary with item counts and any failed projects, and redirect to the dashboard; when the URL/token is unconfigured flash an error pointing at Settings without recording refresh failures
+    - Add a "Refresh now" button (POST form with CSRF) to the work items and merge requests dashboards
+    - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6_
+  - [x] 23.3 Write unit tests: authentication required, unconfigured source flashes a Settings pointer, successful refresh caches items and reports counts, failed project retains cache and is named in the flash
+    - _Requirements: 14.1, 14.3, 14.4, 14.5_
+
+
+- [x] 24. Change password
+  - [x] 24.1 Add `get_admin_password_hash()` / `set_admin_password()` to `ConfigService` (hash stored in the CONFIG table inside the encrypted database) and make login prefer the stored hash over the environment-derived hash
+    - _Requirements: 15.2, 15.3_
+  - [x] 24.2 Implement `GET/POST /auth/change-password` and `app/templates/auth/change_password.html`: require current password, new password (≥ 8 chars), and confirmation; on success store the new hash, delete all other USER_SESSION rows, and flash a confirmation; on failure flash a descriptive error without echoing any submitted value; link the page from the Settings page
+    - _Requirements: 15.1, 15.2, 15.4, 15.5, 15.6_
+  - [x]* 24.3 Write property test for password change round-trip
+    - **Property 39: Password change round-trip**
+    - **Validates: Requirements 15.2, 15.3**
+  - [x] 24.4 Write unit tests: old password rejected after change, new password works across restart-equivalent (fresh app on same DB), wrong current password / short password / mismatched confirmation all rejected without change, other sessions invalidated
+    - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5_
+
+
+- [x] 25. Member filter resolution by configured external identity
+  - [x] 25.1 Make the application username the canonical filter parameter on the work items and merge requests dashboards: dropdown options submit `username`, the blueprint resolves the profile and passes its Jira account ID (fallback: display name) or GitLab username (fallback: application username) to the unchanged service-level matching; render a dashboard notice when a fallback is in use; pass unresolved filter values through unchanged so old URLs keep working
+    - Update the profile form label to say the Jira account ID is used for filtering as well as reassignment
+    - _Requirements: 4.9, 6.7_
+  - [x] 25.2 Write unit tests: filtering by username matches items by the configured account ID / GitLab username, fallback notice appears only when the identity field is unset, legacy raw filter values still match, dropdown options carry usernames
+    - _Requirements: 4.9, 6.7_
+
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for a faster MVP; core implementation tasks must not be skipped.

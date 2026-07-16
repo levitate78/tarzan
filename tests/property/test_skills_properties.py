@@ -133,3 +133,104 @@ def test_summary_aggregation_matches_brute_force(entries):
             and LEVEL_ORDER[aspiration] > LEVEL_ORDER[current]
         )
         assert row.aspiration_count == expected_aspiring
+
+
+import_rows = st.dictionaries(
+    keys=st.tuples(
+        st.integers(min_value=0, max_value=4),  # member index
+        st.integers(min_value=0, max_value=4),  # skill index
+    ),
+    values=st.tuples(levels, optional_levels),
+    min_size=1,
+    max_size=15,
+)
+
+
+def rows_to_csv(rows) -> str:
+    lines = ["username,skill,current_level,aspiration_level"]
+    for (member_index, skill_index), (current, aspiration) in rows.items():
+        lines.append(
+            f"member{member_index},Skill {skill_index},{current},{aspiration or ''}"
+        )
+    return "\n".join(lines) + "\n"
+
+
+def make_import_service(rows):
+    session, service = make_service()
+    for member_index in {member for member, _ in rows}:
+        add_member(session, username=f"member{member_index}", name=f"Member {member_index}")
+    return session, service
+
+
+# Feature: team-dashboard, Property 36: Bulk import round-trip
+@given(rows=import_rows)
+@settings(max_examples=100)
+def test_bulk_import_round_trip(rows):
+    _, service = make_import_service(rows)
+    result = service.import_matrix_csv(rows_to_csv(rows), create_missing_skills=True)
+
+    assert result.ok
+    assert result.imported_count == len(rows)
+    assert result.member_count == len({member for member, _ in rows})
+    assert sorted(result.created_skills) == sorted(
+        {f"Skill {skill}" for _, skill in rows}
+    )
+    for member_index in {member for member, _ in rows}:
+        entries = {
+            entry.skill_name: entry for entry in service.list_matrix(f"member{member_index}")
+        }
+        expected = {
+            f"Skill {skill_index}": (current, aspiration)
+            for (m_index, skill_index), (current, aspiration) in rows.items()
+            if m_index == member_index
+        }
+        assert set(entries) == set(expected)
+        for skill_name, (current, aspiration) in expected.items():
+            assert entries[skill_name].current_level == current
+            assert entries[skill_name].aspiration_level == aspiration
+
+
+# Feature: team-dashboard, Property 37: Bulk import atomicity
+@given(
+    rows=import_rows,
+    failure=st.sampled_from(["unknown_username", "bad_level", "duplicate_pair"]),
+)
+@settings(max_examples=100)
+def test_bulk_import_is_atomic(rows, failure):
+    _, service = make_import_service(rows)
+    csv_text = rows_to_csv(rows)
+    (member_index, skill_index), (current, _) = next(iter(rows.items()))
+    if failure == "unknown_username":
+        csv_text += f"nobody,Skill {skill_index},{current},\n"
+    elif failure == "bad_level":
+        csv_text += f"member{member_index},Skill {skill_index} b,Wizard,\n"
+    else:  # duplicate of an existing row
+        csv_text += f"member{member_index},Skill {skill_index},{current},\n"
+
+    result = service.import_matrix_csv(csv_text, create_missing_skills=True)
+
+    assert not result.ok
+    assert result.imported_count == 0
+    # Nothing was imported and no skills were created, even for valid rows.
+    assert service.list_catalogue() == []
+    for m_index in {member for member, _ in rows}:
+        assert service.list_matrix(f"member{m_index}") == []
+
+
+# Feature: team-dashboard, Property 38: Missing-skill creation is gated by the option
+@given(rows=import_rows)
+@settings(max_examples=100)
+def test_missing_skill_creation_gated_by_option(rows):
+    _, service = make_import_service(rows)
+    csv_text = rows_to_csv(rows)
+
+    rejected = service.import_matrix_csv(csv_text, create_missing_skills=False)
+    assert not rejected.ok
+    assert len(rejected.errors) == len(rows)
+    assert all(error.field == "skill" for error in rejected.errors)
+    assert service.list_catalogue() == []
+
+    accepted = service.import_matrix_csv(csv_text, create_missing_skills=True)
+    assert accepted.ok
+    created = sorted(skill.name for skill in service.list_catalogue())
+    assert created == sorted({f"Skill {skill}" for _, skill in rows})

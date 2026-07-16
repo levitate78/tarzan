@@ -19,6 +19,11 @@ ALLOWED_AVATAR_MIME_TYPES: dict[str, str] = {
 }
 MAX_AVATAR_BYTES: int = 5 * 1024 * 1024  # 5 MiB
 
+# Bulk skills import constraints (Requirement 13).
+MAX_SKILLS_IMPORT_BYTES: int = 1024 * 1024  # 1 MiB
+SKILLS_IMPORT_REQUIRED_COLUMNS: tuple[str, ...] = ("username", "skill", "current_level")
+SKILLS_IMPORT_OPTIONAL_COLUMNS: tuple[str, ...] = ("aspiration_level",)
+
 # Merge request review statuses (Requirement 6.3).
 REVIEW_STATUSES: tuple[str, ...] = ("Awaiting Review", "Changes Requested", "Approved")
 
@@ -28,6 +33,10 @@ CONFIG_REVIEW_THRESHOLD = "review_threshold_days"
 CONFIG_JIRA_URL = "jira_url"
 CONFIG_GITLAB_URL = "gitlab_url"
 CONFIG_IN_REVIEW_STATUSES = "in_review_statuses"
+CONFIG_ADMIN_PASSWORD_HASH = "admin_password_hash"
+
+# Minimum length for a manager password set via the UI (Requirement 15.2).
+MIN_PASSWORD_LENGTH = 8
 
 DEFAULT_REFRESH_INTERVAL_MINUTES = 15  # Requirement 8.1
 DEFAULT_REVIEW_THRESHOLD_DAYS = 2  # Requirement 6.6

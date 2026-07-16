@@ -20,7 +20,10 @@ The full specification lives in `.kiro/specs/team-dashboard/`
   Jira/GitLab identity mapping.
 - **Skills matrix** — shared skill catalogue; per-member current proficiency
   and aspiration levels (Beginner/Intermediate/Advanced/Expert); team-wide
-  skills dashboard with per-level counts and growth aspirations.
+  skills dashboard with per-level counts and growth aspirations; bulk CSV
+  import (`username,skill,current_level,aspiration_level`) that applies
+  atomically, reports per-row errors, and can optionally create missing
+  catalogue skills.
 - **Work items dashboard** — cached Jira issues with blocked and in-review
   indicators, assignee filtering, full detail view (description, comments,
   labels, linked issues), and in-app reassignment.
@@ -30,10 +33,13 @@ The full specification lives in `.kiro/specs/team-dashboard/`
   names.
 - **Background refresh** — configurable 1–60 minute interval (default 15);
   failures never clobber the cache; staleness warnings after 3 consecutive
-  failures; last-refresh timestamps on every dashboard.
+  failures; last-refresh timestamps on every dashboard; on-demand "Refresh
+  now" buttons on the work items and merge requests dashboards.
 - **Security** — SQLCipher (AES-256) encryption at rest, Fernet-wrapped API
   tokens, server-side session invalidation, CSRF protection, HTTPS
-  enforcement, structured JSON logs with secret scrubbing.
+  enforcement, structured JSON logs with secret scrubbing, in-app manager
+  password change (stored hash overrides `TARZAN_ADMIN_PASSWORD` and revokes
+  other sessions).
 
 ## Configuration
 

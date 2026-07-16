@@ -5,16 +5,24 @@
   <h1>Merge requests</h1>
   {% include "partials/_staleness_warning.html" %}
 
+  <form method="post" action="{{ url_for('gitlab.refresh') }}" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button type="submit">Refresh GitLab data now</button>
+  </form>
+
   <form method="get" action="{{ url_for('gitlab.index') }}" class="filter-form">
     <label for="member">Filter by team member (author or reviewer)</label>
     <select id="member" name="member">
       <option value="">Whole team</option>
       {% for m in team_members %}
-      <option value="{{ m.gitlab_username or m.username }}" {% if selected_member == (m.gitlab_username or m.username) %}selected{% endif %}>{{ m.name }}</option>
+      <option value="{{ m.username }}" {% if selected_member == m.username %}selected{% endif %}>{{ m.name }}</option>
       {% endfor %}
     </select>
     <button type="submit">Apply filter</button>
   </form>
+  {% if filter_notice %}
+  <p class="filter-notice">{{ filter_notice }}</p>
+  {% endif %}
 
   {% if no_data %}
   <p class="empty-state error-state">

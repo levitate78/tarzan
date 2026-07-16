@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Bulk skills import{% endblock %}
+{% block content %}
+<section>
+  <h1>Bulk skills import</h1>
+  <p>
+    Upload a CSV file to create or update skills matrix entries for many team
+    members at once. The import is all-or-nothing: if any row has a problem,
+    nothing is imported and the failing rows are listed so you can fix the
+    file and try again.
+  </p>
+
+  <section aria-labelledby="format-heading" class="narrow-panel">
+    <h2 id="format-heading">File format</h2>
+    <p>
+      UTF-8 CSV, up to 1&nbsp;MB, with a header row. Column order and header
+      case do not matter.
+    </p>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">Column</th>
+          <th scope="col">Required</th>
+          <th scope="col">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>username</code></td>
+          <td>yes</td>
+          <td>An existing team member's username</td>
+        </tr>
+        <tr>
+          <td><code>skill</code></td>
+          <td>yes</td>
+          <td>A skill name from the catalogue (see the option below)</td>
+        </tr>
+        <tr>
+          <td><code>current_level</code></td>
+          <td>yes</td>
+          <td>{{ levels | join(", ") }}</td>
+        </tr>
+        <tr>
+          <td><code>aspiration_level</code></td>
+          <td>no</td>
+          <td>{{ levels | join(", ") }}, or empty</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>Example:</p>
+    <pre><code>username,skill,current_level,aspiration_level
+alice,Python,Advanced,Expert
+bob,Terraform,Beginner,
+bob,Python,Intermediate,Advanced</code></pre>
+  </section>
+
+  {% if result and result.errors %}
+  <section aria-labelledby="errors-heading">
+    <h2 id="errors-heading">Problems found ({{ result.errors | length }})</h2>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th scope="col">Row</th>
+          <th scope="col">Column</th>
+          <th scope="col">Problem</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for error in result.errors %}
+        <tr>
+          <td class="count-cell">{{ error.row_number }}</td>
+          <td><code>{{ error.field }}</code></td>
+          <td>{{ error.message }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  {% endif %}
+
+  <section aria-labelledby="upload-heading" class="narrow-panel">
+    <h2 id="upload-heading">Upload</h2>
+    <form method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <p>
+        <label for="file">CSV file</label>
+        <input type="file" id="file" name="file" accept=".csv,text/csv" required>
+      </p>
+      <p>
+        <label>
+          <input type="checkbox" name="create_missing_skills" value="1">
+          Create skills that are not yet in the catalogue
+        </label>
+      </p>
+      <p><button type="submit">Import skills</button></p>
+    </form>
+  </section>
+</section>
+{% endblock %}

@@ -88,6 +88,7 @@ Tarzan is a team management and visibility web application that aggregates data 
 6. THE Application SHALL provide a Work_Items Dashboard showing all active Work_Items (those not in Done, Closed, or Cancelled status) for the team, filterable by assignee.
 7. WHEN a Team_Manager selects an individual Work_Item, THE Application SHALL display the full Work_Item detail view, including description, comments, labels, and linked issues.
 8. IF the Work_Item detail view fails to load, THEN THE Application SHALL display an error message indicating the failure and preserve the current Dashboard state without navigating away.
+9. WHEN a Team_Manager filters the Work_Items Dashboard by a Team_Member, THE Application SHALL match Work_Items using the Team_Member's configured Jira account ID; IF the Team_Member has no Jira account ID configured, THEN THE Application SHALL fall back to matching by the Team_Member's display name and indicate on the Dashboard that the fallback is in use.
 
 ---
 
@@ -118,6 +119,7 @@ Tarzan is a team management and visibility web application that aggregates data 
 4. WHEN a cached Merge_Request has been open longer than the configured Review_Threshold, THE Application SHALL display a coloured border or badge on that Merge_Request on the Merge_Requests Dashboard and individual Team_Member Dashboard views.
 5. THE Application SHALL provide a Merge_Requests Dashboard showing all open Merge_Requests; WHEN a Team_Member filter is applied, THE Application SHALL display only Merge_Requests where the selected Team_Member is the author or a reviewer; WHEN no filter is applied, THE Application SHALL display all open Merge_Requests for the whole team.
 6. THE Application SHALL provide a configurable Review_Threshold expressed in whole days, with a valid range of 1 to 30 days and a default value of 2 days, editable by authenticated Team_Manager users.
+7. WHEN a Team_Manager filters the Merge_Requests Dashboard by a Team_Member, THE Application SHALL match Merge_Requests using the Team_Member's configured GitLab username; IF the Team_Member has no GitLab username configured, THEN THE Application SHALL fall back to matching by the Team_Member's application username and indicate on the Dashboard that the fallback is in use.
 
 ---
 
@@ -209,3 +211,51 @@ Tarzan is a team management and visibility web application that aggregates data 
 3. THE Application SHALL externalise all environment-specific configuration (API endpoints, credentials, thresholds) through environment variables or mounted configuration files, with no hardcoded values in the image.
 4. WHEN the Application starts, THE Application SHALL validate that all required configuration values are present and log a descriptive error indicating which value is missing, then exit with a non-zero exit code.
 5. THE Application SHALL produce structured JSON log lines on stdout, where each line includes at minimum the fields: timestamp (ISO 8601), severity, and message.
+
+---
+
+### Requirement 13: Bulk Skills Import
+
+**User Story:** As a Team_Manager, I want to bulk import Skills_Matrix entries for my Team_Members from a CSV file, so that I can populate or update the whole team's skills data in one step instead of entering each skill by hand.
+
+#### Acceptance Criteria
+
+1. THE Application SHALL provide a bulk import page where an authenticated Team_Manager can upload a CSV file of Skills_Matrix entries with a header row naming the columns `username`, `skill`, `current_level`, and optionally `aspiration_level` (column order and header case insensitive).
+2. WHEN a Team_Manager uploads a CSV file in which every row is valid, THE Application SHALL create or update the Skills_Matrix entry for each row and display a summary including the number of entries imported and the number of Team_Members affected.
+3. THE Application SHALL apply a bulk import atomically: IF any row fails validation, THEN THE Application SHALL import no rows, leave the Skills_Matrix and Skill_Catalogue unchanged, and display each failing row's number, field, and reason without echoing the invalid value.
+4. WHEN the Team_Manager selects the "create missing skills" option, THE Application SHALL add skills referenced in the CSV that are not in the Skill_Catalogue (case-insensitive match) to the Skill_Catalogue as part of the same import; IF the option is not selected, THEN each row referencing an unknown skill SHALL be reported as a validation error.
+5. IF a row references a username that does not match an existing Team_Member (case-insensitive), THEN THE Application SHALL report a validation error for that row.
+6. IF a row's proficiency or aspiration level does not match one of the defined levels (Beginner, Intermediate, Advanced, Expert; case-insensitive), THEN THE Application SHALL report a validation error for that row indicating the valid levels.
+7. IF the same username and skill combination appears in more than one row of the file, THEN THE Application SHALL report a validation error identifying both row numbers.
+8. IF the uploaded file exceeds 1 MB, is not valid UTF-8 text, or does not contain the required header columns, THEN THE Application SHALL reject the import and display a descriptive error.
+9. THE Application SHALL restrict bulk import to authenticated Team_Manager users.
+
+---
+
+### Requirement 14: Manual Data Refresh
+
+**User Story:** As a Team_Manager, I want to trigger an immediate refresh of Jira and GitLab data from the dashboards, so that I can pull in the latest state on demand without waiting for the next Background_Updater cycle.
+
+#### Acceptance Criteria
+
+1. THE Application SHALL provide a manual refresh control on the Work_Items Dashboard (refreshing all enabled Jira projects) and on the Merge_Requests Dashboard (refreshing all enabled GitLab projects), available only to authenticated Team_Manager users.
+2. WHEN a Team_Manager triggers a manual refresh, THE Application SHALL fetch data for every enabled project of the corresponding source, update the Cache, and record each project's refresh outcome exactly as a Background_Updater cycle would.
+3. WHEN a manual refresh completes, THE Application SHALL display a summary including the number of projects refreshed and items fetched, and SHALL identify any project whose refresh failed.
+4. IF the corresponding API URL or token is not configured, THEN THE Application SHALL display an error directing the Team_Manager to the Settings page and SHALL NOT record refresh failures against the configured projects.
+5. IF a manual refresh fails for a project, THEN THE Application SHALL retain the existing cached data for that project unchanged (consistent with Requirements 4.2 and 6.2).
+6. THE manual refresh SHALL run only in response to the explicit refresh action; dashboard page renders SHALL continue to make no synchronous external API calls (Requirement 9.5).
+
+---
+
+### Requirement 15: Password Management
+
+**User Story:** As a Team_Manager, I want to change my password from the UI, so that I can rotate my credentials without editing environment variables and restarting the Application.
+
+#### Acceptance Criteria
+
+1. THE Application SHALL provide a change-password page for the authenticated Team_Manager that requires the current password, a new password, and a confirmation of the new password.
+2. WHEN the submitted current password is correct, the new password is at least 8 characters long, and the confirmation matches the new password, THE Application SHALL store a salted hash of the new password in the encrypted database and apply it to subsequent logins immediately, without an application restart.
+3. WHILE a stored password hash exists, THE Application SHALL use it for login verification in place of the TARZAN_ADMIN_PASSWORD environment value.
+4. IF the current password is incorrect, the new password is shorter than 8 characters, or the confirmation does not match, THEN THE Application SHALL reject the change with a descriptive error, leave the existing password unchanged, and never echo any submitted password value.
+5. WHEN the password is changed, THE Application SHALL invalidate all other active sessions for the Team_Manager server-side, keeping only the session that made the change.
+6. THE Application SHALL never write submitted or stored password values to log output (per Requirement 10.2).

@@ -3,6 +3,7 @@
 {% block content %}
 <section>
   <h1>Skill catalogue</h1>
+  <p><a href="{{ url_for('skills.import_matrix') }}">Bulk import skills from a CSV file</a></p>
   <form method="post" action="{{ url_for('skills.add_skill') }}" class="inline-add-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label for="name">New skill name</label>

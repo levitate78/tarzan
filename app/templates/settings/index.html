@@ -4,6 +4,11 @@
 <section>
   <h1>Settings</h1>
 
+  <section aria-labelledby="account-heading" class="settings-section">
+    <h2 id="account-heading">Account</h2>
+    <p><a href="{{ url_for('auth.change_password') }}">Change your password</a></p>
+  </section>
+
   <section aria-labelledby="api-heading" class="settings-section">
     <h2 id="api-heading">API credentials</h2>
     <form method="post" action="{{ url_for('settings.update_credentials') }}">

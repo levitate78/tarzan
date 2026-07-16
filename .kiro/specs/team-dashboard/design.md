@@ -94,12 +94,18 @@ Each Blueprint owns a URL prefix and a small set of route functions. Route funct
 
 | Blueprint | Prefix | Responsibilities |
 |---|---|---|
-| `auth_bp` | `/auth` | Login, logout, session management |
+| `auth_bp` | `/auth` | Login, logout, session management, change password |
 | `profiles_bp` | `/profiles` | Team member profile CRUD |
 | `skills_bp` | `/skills` | Skill catalogue management, skills dashboard |
-| `jira_bp` | `/jira` | Work items dashboard, detail view, reassignment |
-| `gitlab_bp` | `/gitlab` | Merge requests dashboard |
+| `jira_bp` | `/jira` | Work items dashboard, detail view, reassignment, manual refresh |
+| `gitlab_bp` | `/gitlab` | Merge requests dashboard, manual refresh |
 | `settings_bp` | `/settings` | Configuration: API credentials, thresholds, intervals |
+
+**Manual refresh (Requirement 14)**: `POST /jira/refresh` and `POST /gitlab/refresh` are explicit user actions (like reassignment) that call the same `fetch_and_cache()` service path the Background_Updater uses, for every enabled project of that source, then redirect back to the dashboard with a summary flash. Dashboard page renders remain cache-only (Requirement 9.5). When the source's URL/token is not configured the route flashes an error pointing at Settings without recording refresh failures.
+
+**Member filter resolution (Requirements 4.9, 6.7)**: the dashboard filter dropdowns submit the Team_Member's application username as the canonical filter parameter. The Blueprint resolves the username to a profile and passes the member's configured external identity to the service layer — the Jira account ID for Work_Items (falling back to display name when unset) and the GitLab username for Merge_Requests (falling back to the application username when unset). When a fallback is in use, the dashboard renders a notice prompting the Team_Manager to configure the identity field. Filter values that do not match any profile username (e.g. bookmarked URLs carrying a raw account ID or display name) are passed to the service unchanged, so the service-level matching semantics of Property 15 are unaffected.
+
+**Change password (Requirement 15)**: `GET/POST /auth/change-password` verifies the current password, validates the new password (≥ 8 characters, matching confirmation), and stores a salted hash in the `CONFIG` table inside the SQLCipher-encrypted database. Login prefers the stored hash over the hash derived from `TARZAN_ADMIN_PASSWORD`, so the change applies immediately and survives restarts. All other `USER_SESSION` rows for the manager are deleted on change (server-side invalidation), keeping only the session that made the change.
 
 ### 3. Service Layer (`app/services/`)
 
@@ -121,7 +127,10 @@ class SkillsService:
     def remove_skill(skill_id: int) -> RemovalResult  # includes reference count
     def assign_skill(username: str, skill_id: int, current: Level, aspiration: Level | None) -> None
     def get_team_skills_summary() -> list[SkillSummaryDTO]
+    def import_matrix_csv(csv_text: str, create_missing_skills: bool = False) -> SkillsImportResult
 ```
+
+`import_matrix_csv` implements the bulk skills import (Requirement 13). It parses CSV text with a header row (`username`, `skill`, `current_level`, optional `aspiration_level`; header case and column order insensitive), validates every row, and applies the import atomically: if any row is invalid, no rows are imported and the returned `SkillsImportResult` carries one `ImportRowError` (row number, field, reason — never the invalid value) per failing row. Valid imports upsert matrix entries exactly as `assign_skill` would, in a single commit. When `create_missing_skills` is true, skills referenced by the CSV but absent from the catalogue (case-insensitive) are added to the catalogue as part of the same atomic import.
 
 ```python
 class JiraService:
@@ -200,6 +209,7 @@ templates/
   skills/
     catalogue.html
     dashboard.html
+    import.html
   jira/
     index.html
     detail.html
@@ -639,6 +649,40 @@ The same property holds for the SQLCipher database file: for any record written 
 
 ---
 
+### Property 36: Bulk import round-trip
+
+*For any* set of rows pairing an existing Team_Member with a skill name and valid current/aspiration levels (each username–skill pair distinct), rendering those rows as a CSV file and importing it via `SkillsService.import_matrix_csv()` with `create_missing_skills=True` must succeed with no row errors, and each Team_Member's Skills_Matrix read back via `list_matrix()` must contain exactly the imported entries with `current_level` and `aspiration_level` matching the CSV values.
+
+**Validates: Requirements 13.2, 13.4**
+
+---
+
+### Property 37: Bulk import atomicity
+
+*For any* CSV containing at least one invalid row (unknown username, unknown skill without the create-missing option, invalid level, or duplicate username–skill pair), `SkillsService.import_matrix_csv()` must report at least one `ImportRowError`, import zero rows, and leave both the Skills_Matrix and the Skill_Catalogue exactly as they were before the call — even for the valid rows in the same file, and even when `create_missing_skills=True`.
+
+**Validates: Requirements 13.3, 13.5, 13.6, 13.7**
+
+---
+
+### Property 38: Missing-skill creation is gated by the option
+
+*For any* CSV whose rows reference existing Team_Members but skills absent from the Skill_Catalogue: importing with `create_missing_skills=False` must fail with one row error per unknown-skill row and leave the catalogue unchanged; importing the same CSV with `create_missing_skills=True` must succeed, adding each distinct missing skill to the catalogue exactly once.
+
+**Validates: Requirements 13.4**
+
+---
+
+### Property 39: Password change round-trip
+
+*For any* new password value, storing it via the password-change flow must persist a hash from which the original password verifies (`check_password_hash` returns True), any other password is rejected, and the stored hash string does not contain the plaintext password. The stored hash must take precedence over the environment-derived hash at login.
+
+Manual refresh (Requirement 14) introduces no new cache semantics: it reuses `fetch_and_cache()`, whose round-trip and failure-retention behaviour is already covered by Properties 11 and 12; the routes themselves are covered by unit tests.
+
+**Validates: Requirements 15.2, 15.3**
+
+---
+
 ## Error Handling
 
 ### Strategy
@@ -758,6 +802,10 @@ The following correctness properties map directly to property tests:
 | 33 Session invalidation after logout | `test_security_properties.py` | `st.uuids()` session tokens |
 | 34 HTTPS enforcement | `test_security_properties.py` | `st.from_regex(r"http://[^/]+/.*")` |
 | 35 Alt text length | `test_renderers.py` | All rendered pages checked |
+| 36 Bulk import round-trip | `test_skills_properties.py` | `st.dictionaries()` of member/skill pairs → levels, rendered to CSV |
+| 37 Bulk import atomicity | `test_skills_properties.py` | Valid rows + one invalid row (sampled failure kind) |
+| 38 Missing-skill creation gated | `test_skills_properties.py` | Unknown skill names, imported with flag off then on |
+| 39 Password change round-trip | `test_security_properties.py` | `st.text()` password pairs, hash verification both ways |
 
 ### Unit Tests
 

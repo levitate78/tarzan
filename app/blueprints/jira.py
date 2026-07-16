@@ -9,13 +9,12 @@ from flask import Blueprint, abort, flash, redirect, render_template, request, u
 from flask_login import login_required
 
 from app.blueprints.common import (
-    config_service,
-    credential_service,
+    build_jira_client,
+    enabled_jira_projects,
     jira_refresh_statuses,
     jira_service,
     profile_service,
 )
-from app.constants import CREDENTIAL_JIRA_TOKEN
 from app.exceptions import (
     JiraClientError,
     NotFoundError,
@@ -38,35 +37,87 @@ def _validate_issue_key(issue_key: str) -> str:
     return issue_key
 
 
-def _build_client():
-    """Build a JiraClient for an explicit user action (reassignment only —
-    dashboard reads never touch the external API)."""
-    cfg = config_service()
-    url = cfg.get_jira_url()
-    token = credential_service().get_credential(CREDENTIAL_JIRA_TOKEN)
-    if not url or not token:
-        return None
-    from app.clients.jira_client import JiraClient
-
-    return JiraClient(server=url, token=token)
-
-
 @jira_bp.get("/")
 @login_required
 def index():
-    assignee = request.args.get("assignee", "").strip() or None
+    """Work items dashboard. The assignee filter takes a team member's
+    Tarzan username and resolves it to their configured Jira account ID
+    (falling back to display name when none is set); raw account IDs or
+    display names in old URLs keep working unchanged (Requirement 4.9)."""
+    raw_filter = request.args.get("assignee", "").strip() or None
+    filter_value = raw_filter
+    selected_username = None
+    filter_notice = None
+    if raw_filter:
+        profile = profile_service().get_profile(raw_filter)
+        if profile is not None:
+            selected_username = profile.username
+            filter_value = profile.jira_account_id or profile.name
+            if not profile.jira_account_id:
+                filter_notice = (
+                    f"{profile.name} has no Jira account ID configured, so "
+                    "work items are matched by display name. Set the Jira "
+                    "account ID on their profile for exact matching."
+                )
     service = jira_service()
-    items = service.list_work_items(assignee=assignee)
+    items = service.list_work_items(assignee=filter_value)
     statuses = jira_refresh_statuses()
     no_data = service.cache_is_empty() and not any(s.last_success for s in statuses)
     return render_template(
         "jira/index.html",
         items=items,
         team_members=profile_service().list_profiles(),
-        selected_assignee=assignee,
+        selected_assignee=selected_username,
+        filter_notice=filter_notice,
         refresh_statuses=statuses,
         no_data=no_data,
     )
+
+
+@jira_bp.post("/refresh")
+@login_required
+def refresh():
+    """Manual refresh of every enabled Jira project (Requirement 14): an
+    explicit user action running the same fetch path as the scheduler."""
+    projects = enabled_jira_projects()
+    if not projects:
+        flash("No Jira projects are configured; add them in Settings first.", "info")
+        return redirect(url_for("jira.index"))
+    try:
+        client = build_jira_client()
+    except (JiraClientError, StorageError):
+        flash("Jira is not reachable; the data was not refreshed.", "error")
+        return redirect(url_for("jira.index"))
+    if client is None:
+        flash(
+            "Jira is not configured; set the Jira URL and API token in Settings.",
+            "error",
+        )
+        return redirect(url_for("jira.index"))
+
+    service = jira_service(client=client)
+    item_count = 0
+    refreshed = 0
+    failed: list[str] = []
+    for project in projects:
+        result = service.fetch_and_cache(project.project_key)
+        if result.success:
+            refreshed += 1
+            item_count += result.item_count
+        else:
+            failed.append(project.display_name or project.project_key)
+    if refreshed:
+        flash(
+            f"Refreshed {refreshed} Jira project(s): {item_count} work item(s) fetched.",
+            "success",
+        )
+    if failed:
+        flash(
+            f"Refresh failed for: {', '.join(failed)}. "
+            "Existing cached data was kept.",
+            "error",
+        )
+    return redirect(url_for("jira.index"))
 
 
 @jira_bp.get("/<issue_key>")
@@ -96,7 +147,7 @@ def reassign(issue_key: str):
         flash("Choose a team member to assign the work item to.", "error")
         return redirect(url_for("jira.detail", issue_key=issue_key))
     try:
-        client = _build_client()
+        client = build_jira_client()
     except (JiraClientError, StorageError):
         flash("Jira is not reachable; the work item was not reassigned.", "error")
         return redirect(url_for("jira.detail", issue_key=issue_key))

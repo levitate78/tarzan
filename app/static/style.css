@@ -203,6 +203,7 @@ button.danger { background: var(--color-error); }
 .inline-add-form label { margin: 0; }
 .inline-add-form input { width: auto; }
 .filter-form { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: end; margin: 1rem 0; }
+.filter-notice { color: var(--color-muted); font-size: 0.9rem; margin-top: -0.5rem; }
 .filter-form label { margin: 0; }
 .filter-form select { width: auto; min-width: 12rem; }
 
