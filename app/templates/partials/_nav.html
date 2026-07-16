@@ -1,6 +1,8 @@
 <nav aria-label="Main navigation">
   <ul class="nav-list">
     <li><a href="{{ url_for('jira.index') }}">Work Items</a></li>
+    <li><a href="{{ url_for('jira.blocked') }}">Blocked</a></li>
+    <li><a href="{{ url_for('jira.epics') }}">Epics</a></li>
     <li><a href="{{ url_for('gitlab.index') }}">Merge Requests</a></li>
     <li><a href="{{ url_for('skills.dashboard') }}">Skills Dashboard</a></li>
     <li><a href="{{ url_for('profiles.index') }}">Team</a></li>

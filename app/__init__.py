@@ -90,6 +90,22 @@ def create_app(config: Config | None = None) -> Flask:
             return "never"
         return value.strftime("%Y-%m-%d %H:%M")
 
+    @app.template_filter("duration")
+    def format_duration(value):
+        """Human-readable elapsed time since a naive UTC datetime
+        (e.g. '3 days', '2 hours', 'less than an hour')."""
+        from app.util import utcnow
+
+        if value is None:
+            return "unknown"
+        elapsed = utcnow() - value
+        if elapsed.days >= 1:
+            return f"{elapsed.days} day{'s' if elapsed.days != 1 else ''}"
+        hours = elapsed.seconds // 3600
+        if hours >= 1:
+            return f"{hours} hour{'s' if hours != 1 else ''}"
+        return "less than an hour"
+
     # -- Error handlers (Requirement 10.4, design: HTTP error pages) --------
     @app.errorhandler(400)
     def bad_request(error):

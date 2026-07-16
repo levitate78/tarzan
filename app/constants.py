@@ -10,6 +10,13 @@ LEVEL_ORDER: dict[str, int] = {name: index for index, name in enumerate(LEVELS)}
 # Work items in these statuses are not "active" (Requirement 4.6).
 DONE_STATUSES: frozenset[str] = frozenset({"done", "closed", "cancelled"})
 
+# Jira issue type (lowercased) identifying epics on the epics dashboard.
+EPIC_ISSUE_TYPE = "epic"
+
+# Per-project component name constraints (Settings component filters).
+MAX_COMPONENT_NAME_LENGTH = 100
+MAX_COMPONENTS_PER_PROJECT = 20
+
 # Avatar upload constraints (Requirement 1.7).
 ALLOWED_AVATAR_MIME_TYPES: dict[str, str] = {
     "image/jpeg": "jpg",

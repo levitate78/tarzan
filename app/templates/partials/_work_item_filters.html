@@ -1,0 +1,39 @@
+{# Context: form_action (url), show_status (bool), team_members,
+   selected_assignee, filters (dict of status/component/epic),
+   filter_options (WorkItemFilterOptions), filter_notice. #}
+<form method="get" action="{{ form_action }}" class="filter-form">
+  <label for="assignee">Assignee</label>
+  <select id="assignee" name="assignee">
+    <option value="">All team members</option>
+    {% for member in team_members %}
+    <option value="{{ member.username }}" {% if selected_assignee == member.username %}selected{% endif %}>{{ member.name }}</option>
+    {% endfor %}
+  </select>
+  {% if show_status %}
+  <label for="status">Status</label>
+  <select id="status" name="status">
+    <option value="">All statuses</option>
+    {% for status in filter_options.statuses %}
+    <option value="{{ status }}" {% if filters.status and filters.status | lower == status | lower %}selected{% endif %}>{{ status }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+  <label for="component">Component</label>
+  <select id="component" name="component">
+    <option value="">All components</option>
+    {% for component in filter_options.components %}
+    <option value="{{ component }}" {% if filters.component and filters.component | lower == component | lower %}selected{% endif %}>{{ component }}</option>
+    {% endfor %}
+  </select>
+  <label for="epic">Parent epic</label>
+  <select id="epic" name="epic">
+    <option value="">All epics</option>
+    {% for epic_key, epic_summary in filter_options.epics %}
+    <option value="{{ epic_key }}" {% if filters.epic and filters.epic | upper == epic_key | upper %}selected{% endif %}>{{ epic_key }}{% if epic_summary %} — {{ epic_summary }}{% endif %}</option>
+    {% endfor %}
+  </select>
+  <button type="submit">Apply filters</button>
+</form>
+{% if filter_notice %}
+<p class="filter-notice">{{ filter_notice }}</p>
+{% endif %}

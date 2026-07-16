@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Epics{% endblock %}
+{% block content %}
+<section>
+  <h1>Epics</h1>
+  {% include "partials/_staleness_warning.html" %}
+
+  <form method="get" action="{{ url_for('jira.epics') }}" class="filter-form">
+    <label for="fix_version">Fix version</label>
+    <select id="fix_version" name="fix_version">
+      <option value="">All fix versions</option>
+      {% for version in fix_versions %}
+      <option value="{{ version }}" {% if selected_fix_version and selected_fix_version | lower == version | lower %}selected{% endif %}>{{ version }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Apply filter</button>
+  </form>
+
+  {% if no_data %}
+  <p class="empty-state error-state">
+    No work item data is available yet and the Jira API has not been reached.
+    Verify the API configuration in <a href="{{ url_for('settings.index') }}">Settings</a>.
+  </p>
+  {% elif epics %}
+  <div class="card-list">
+    {% for epic in epics %}
+    <article class="card epic-card">
+      <h3 class="card-title">
+        <a href="{{ url_for('jira.detail', issue_key=epic.issue_key) }}">{{ epic.issue_key }}</a>
+        <span class="work-item-summary">{{ epic.summary }}</span>
+      </h3>
+      <dl class="card-fields">
+        <div><dt>Status</dt><dd>{{ epic.status }}</dd></div>
+        <div><dt>Priority</dt><dd>{{ epic.priority or "None" }}</dd></div>
+        <div><dt>Assignee</dt><dd>{{ epic.assignee_display_name or "Unassigned" }}</dd></div>
+        <div><dt>Fix versions</dt><dd>{{ epic.fix_versions | join(", ") or "None" }}</dd></div>
+        <div><dt>Progress</dt><dd>{{ epic.child_done }} of {{ epic.child_total }} child item(s) done</dd></div>
+      </dl>
+      {% if epic.child_blocked %}
+      <span class="badge badge-blocked" role="status">⛔ {{ epic.child_blocked }} blocked child item(s)</span>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty-state">No active epics match the current filter.</p>
+  {% endif %}
+</section>
+{% endblock %}

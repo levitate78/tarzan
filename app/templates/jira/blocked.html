@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Blocked work items{% endblock %}
+{% block content %}
+<section>
+  <h1>Blocked work items</h1>
+  {% include "partials/_staleness_warning.html" %}
+
+  {% with form_action = url_for('jira.blocked'), show_status = False %}
+  {% include "partials/_work_item_filters.html" %}
+  {% endwith %}
+
+  {% if no_data %}
+  <p class="empty-state error-state">
+    No work item data is available yet and the Jira API has not been reached.
+    Verify the API configuration in <a href="{{ url_for('settings.index') }}">Settings</a>.
+  </p>
+  {% elif items %}
+  <table class="data-table blocked-table">
+    <thead>
+      <tr>
+        <th scope="col">Work item</th>
+        <th scope="col">Assignee</th>
+        <th scope="col">Priority</th>
+        <th scope="col">Status</th>
+        <th scope="col">Blocked for</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>
+          <a href="{{ url_for('jira.detail', issue_key=item.issue_key) }}">{{ item.issue_key }}</a>
+          {{ item.summary }}
+        </td>
+        <td>{{ item.assignee_display_name or item.assignee_account_id or "Unassigned" }}</td>
+        <td>{{ item.priority or "None" }}</td>
+        <td>{{ item.status }}</td>
+        <td>
+          {% if item.blocked_since %}
+          <time datetime="{{ item.blocked_since.isoformat() }}">{{ item.blocked_since | duration }}</time>
+          {% else %}
+          Unknown
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty-state">No blocked work items match the current filter. 🎉</p>
+  {% endif %}
+</section>
+{% endblock %}

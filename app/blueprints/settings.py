@@ -3,6 +3,7 @@ project configuration (Requirements 6.6, 8.1, 12.3)."""
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 
@@ -11,7 +12,12 @@ from flask_login import login_required
 from sqlalchemy import select
 
 from app.blueprints.common import config_service, credential_service
-from app.constants import CREDENTIAL_GITLAB_TOKEN, CREDENTIAL_JIRA_TOKEN
+from app.constants import (
+    CREDENTIAL_GITLAB_TOKEN,
+    CREDENTIAL_JIRA_TOKEN,
+    MAX_COMPONENT_NAME_LENGTH,
+    MAX_COMPONENTS_PER_PROJECT,
+)
 from app.db import get_session
 from app.exceptions import StorageError, ValidationError
 from app.models import GitLabProject, JiraProject
@@ -36,6 +42,13 @@ def index():
     except StorageError:
         flash("The credential store is currently unavailable.", "error")
         jira_token_set = gitlab_token_set = False
+    jira_projects = session.execute(select(JiraProject)).scalars().all()
+    jira_project_components = {
+        project.id: json.loads(project.components_json)
+        if project.components_json
+        else []
+        for project in jira_projects
+    }
     return render_template(
         "settings/index.html",
         jira_url=cfg.get_jira_url() or "",
@@ -44,7 +57,8 @@ def index():
         gitlab_token_set=gitlab_token_set,
         refresh_interval=cfg.get_refresh_interval_minutes(),
         review_threshold=cfg.get_review_threshold_days(),
-        jira_projects=session.execute(select(JiraProject)).scalars().all(),
+        jira_projects=jira_projects,
+        jira_project_components=jira_project_components,
         gitlab_projects=session.execute(select(GitLabProject)).scalars().all(),
     )
 
@@ -113,6 +127,39 @@ def update_review_threshold():
     return redirect(url_for("settings.index"))
 
 
+def _parse_components(raw: str) -> list[str]:
+    """Parse and validate a comma-separated component list. An empty input
+    means no component filter (all components)."""
+    components: list[str] = []
+    seen: set[str] = set()
+    for part in raw.split(","):
+        name = part.strip()
+        if not name:
+            continue
+        if len(name) > MAX_COMPONENT_NAME_LENGTH:
+            raise ValidationError(
+                f"Each component name must be at most {MAX_COMPONENT_NAME_LENGTH} "
+                "characters.",
+                field="components",
+            )
+        if '"' in name or "\\" in name:
+            raise ValidationError(
+                "Component names cannot contain double quotes or backslashes.",
+                field="components",
+            )
+        if name.casefold() in seen:
+            continue
+        seen.add(name.casefold())
+        components.append(name)
+    if len(components) > MAX_COMPONENTS_PER_PROJECT:
+        raise ValidationError(
+            f"A project can be filtered to at most {MAX_COMPONENTS_PER_PROJECT} "
+            "components.",
+            field="components",
+        )
+    return components
+
+
 @settings_bp.post("/projects/jira")
 @login_required
 def add_jira_project():
@@ -125,6 +172,12 @@ def add_jira_project():
             "error",
         )
         return redirect(url_for("settings.index"))
+    try:
+        components = _parse_components(request.form.get("components", ""))
+    except ValidationError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("settings.index"))
+    components_json = json.dumps(components) if components else None
     session = get_session()
     existing = session.execute(
         select(JiraProject).where(JiraProject.project_key == project_key)
@@ -132,10 +185,24 @@ def add_jira_project():
     if existing is not None:
         existing.enabled = True
         existing.display_name = display_name or existing.display_name
+        existing.components_json = components_json
     else:
-        session.add(JiraProject(project_key=project_key, display_name=display_name))
+        session.add(
+            JiraProject(
+                project_key=project_key,
+                display_name=display_name,
+                components_json=components_json,
+            )
+        )
     session.commit()
-    flash(f"Jira project {project_key} configured.", "success")
+    if components:
+        flash(
+            f"Jira project {project_key} configured, filtered to components: "
+            f"{', '.join(components)}.",
+            "success",
+        )
+    else:
+        flash(f"Jira project {project_key} configured (all components).", "success")
     return redirect(url_for("settings.index"))
 
 

@@ -61,12 +61,13 @@
     <h2 id="jira-projects-heading">Jira projects</h2>
     {% if jira_projects %}
     <table class="data-table">
-      <thead><tr><th scope="col">Key</th><th scope="col">Name</th><th scope="col">Enabled</th><th scope="col">Actions</th></tr></thead>
+      <thead><tr><th scope="col">Key</th><th scope="col">Name</th><th scope="col">Components</th><th scope="col">Enabled</th><th scope="col">Actions</th></tr></thead>
       <tbody>
         {% for project in jira_projects %}
         <tr>
           <td>{{ project.project_key }}</td>
           <td>{{ project.display_name }}</td>
+          <td>{{ jira_project_components[project.id] | join(", ") or "All components" }}</td>
           <td>{{ "Yes" if project.enabled else "No" }}</td>
           <td>
             <form method="post" action="{{ url_for('settings.remove_jira_project', project_id=project.id) }}" class="inline-form">
@@ -87,8 +88,11 @@
       <input type="text" id="project_key" name="project_key" required placeholder="PROJ">
       <label for="jira_display_name">Display name</label>
       <input type="text" id="jira_display_name" name="display_name">
+      <label for="jira_components">Components (comma-separated, blank for all)</label>
+      <input type="text" id="jira_components" name="components" placeholder="Backend, API">
       <button type="submit">Add Jira project</button>
     </form>
+    <p class="form-hint">Re-adding an existing project key updates its display name and component filter. When components are set, only work items in those components are fetched.</p>
   </section>
 
   <section aria-labelledby="gitlab-projects-heading" class="settings-section">
