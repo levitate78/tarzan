@@ -12,8 +12,9 @@ header names case-insensitive):
 - ``username``          Tarzan username of the team member (required)
 - ``skill``             skill name, matched case-insensitively against the
                         catalogue (required)
-- ``level``             integer 0-5 (required)
-- ``aspiration_level``  integer 0-5, may be blank (optional column)
+- ``level``             integer 0-5 or a level name (required)
+- ``aspiration_level``  integer 0-5 or a level name, may be blank (optional
+                        column)
 - ``category``          skill category; only used to create a skill that is
                         not in the catalogue yet (optional column)
 """
@@ -30,6 +31,17 @@ from app.schemas import SkillCategory
 MAX_ROWS = 5000
 LEVEL_MIN = 0
 LEVEL_MAX = 5
+
+# Named proficiency levels (spec: .kiro/specs/team-dashboard) mapped onto the
+# 0-5 scale the application stores (see SkillLevelSet in openapi.yaml).
+LEVEL_NAMES = {
+    "none": 0,
+    "beginner": 1,
+    "elementary": 2,
+    "intermediate": 3,
+    "advanced": 4,
+    "expert": 5,
+}
 
 REQUIRED_COLUMNS = ("username", "skill", "level")
 OPTIONAL_COLUMNS = ("aspiration_level", "category")
@@ -61,18 +73,26 @@ class SkillsCsvParseResult:
         return len(self.rows) + len(self.errors)
 
 
+# Per the spec's input-validation requirement, error messages describe the
+# problem and the valid values but never echo the invalid value back.
 def _parse_level(raw: str, column: str, *, required: bool) -> Optional[int]:
     value = raw.strip()
     if not value:
         if required:
             raise ValueError(f"'{column}' is required")
         return None
+    named = LEVEL_NAMES.get(value.lower())
+    if named is not None:
+        return named
     try:
         level = int(value)
     except ValueError:
-        raise ValueError(f"'{column}' must be an integer, got '{value}'") from None
+        raise ValueError(
+            f"'{column}' must be an integer between {LEVEL_MIN} and {LEVEL_MAX} "
+            f"or one of: {', '.join(LEVEL_NAMES)}"
+        ) from None
     if not LEVEL_MIN <= level <= LEVEL_MAX:
-        raise ValueError(f"'{column}' must be between {LEVEL_MIN} and {LEVEL_MAX}, got {level}")
+        raise ValueError(f"'{column}' must be between {LEVEL_MIN} and {LEVEL_MAX}")
     return level
 
 
@@ -123,14 +143,14 @@ def parse_skills_csv(content: str) -> SkillsCsvParseResult:
                 raise ValueError("'skill' is required")
             if category is not None and category not in VALID_CATEGORIES:
                 raise ValueError(
-                    f"unknown category '{category}' (valid: {', '.join(sorted(VALID_CATEGORIES))})"
+                    f"unknown category (valid: {', '.join(sorted(VALID_CATEGORIES))})"
                 )
             level = _parse_level(cell(record, "level"), "level", required=True)
             aspiration = _parse_level(cell(record, "aspiration_level"), "aspiration_level", required=False)
 
             key = (username, skill_name.lower())
             if key in seen:
-                raise ValueError(f"duplicate row for user '{username}' and skill '{skill_name}'")
+                raise ValueError("duplicate of an earlier row for the same user and skill")
             seen.add(key)
         except ValueError as exc:
             result.errors.append((line, str(exc)))

@@ -61,14 +61,16 @@ async def import_skill_levels(
     levels_updated = 0
 
     for row in parsed.rows:
+        # Per the spec's input-validation requirement, messages don't echo the
+        # submitted value; the line number locates the offending row.
         user = users_by_username.get(row.username)
         if not user:
             errors.append(SkillsImportRowError(
-                line=row.line, message=f"unknown username '{row.username}'"))
+                line=row.line, message="username does not match any team member"))
             continue
         if not user.is_active:
             errors.append(SkillsImportRowError(
-                line=row.line, message=f"user '{row.username}' is deactivated"))
+                line=row.line, message="team member is deactivated"))
             continue
 
         skill = skills_by_name.get(row.skill_name.lower())
@@ -76,10 +78,7 @@ async def import_skill_levels(
             if not row.category:
                 errors.append(SkillsImportRowError(
                     line=row.line,
-                    message=(
-                        f"skill '{row.skill_name}' is not in the catalogue; "
-                        "provide a 'category' to create it"
-                    ),
+                    message="skill is not in the catalogue; provide a 'category' to create it",
                 ))
                 continue
             skill = Skill(name=row.skill_name, category=row.category)

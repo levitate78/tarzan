@@ -158,8 +158,10 @@ bob,Terraform,2,,devops
 - `skill` — matched case-insensitively against the skill catalogue. If the
   skill doesn't exist yet and a `category` is provided, it is created;
   otherwise the row is reported as an error.
-- `level` — 0–5 (0=None … 5=Expert).
-- `aspiration_level` *(optional)* — 0–5, may be left blank.
+- `level` — 0–5, or a level name (`none`, `beginner`, `elementary`,
+  `intermediate`, `advanced`, `expert`; case-insensitive).
+- `aspiration_level` *(optional)* — same values as `level`, may be left
+  blank.
 - `category` *(optional)* — one of `languages`, `frameworks`, `cloud`,
   `databases`, `devops`, `testing`, `soft_skills`, `other`; only used when
   creating a missing skill.

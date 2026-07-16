@@ -498,7 +498,9 @@ paths:
       summary: Bulk import team member skill levels from CSV (admin only)
       description: |
         Accepts CSV content with a header row of
-        `username,skill,level[,aspiration_level][,category]`. Skill names are
+        `username,skill,level[,aspiration_level][,category]`. Levels are
+        integers 0-5 or named levels (none, beginner, elementary,
+        intermediate, advanced, expert, case-insensitive). Skill names are
         matched case-insensitively against the catalogue; a missing skill is
         created when the row supplies a `category`. Existing (user, skill)
         levels are updated in place, so re-importing the same file is

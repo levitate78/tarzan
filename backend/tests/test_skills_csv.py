@@ -62,6 +62,7 @@ def test_duplicate_header_column_raises():
         ("alice,,3", "'skill' is required"),
         ("alice,Python,", "'level' is required"),
         ("alice,Python,abc", "must be an integer"),
+        ("alice,Python,guru", "must be an integer"),
         ("alice,Python,6", "between 0 and 5"),
         ("alice,Python,-1", "between 0 and 5"),
     ],
@@ -83,12 +84,25 @@ def test_invalid_aspiration_level_is_reported():
     assert "aspiration_level" in result.errors[0][1]
 
 
-def test_unknown_category_is_reported():
+def test_unknown_category_is_reported_without_echoing_value():
     result = parse_skills_csv(
         "username,skill,level,category\nalice,Python,3,wizardry\n"
     )
     assert result.rows == []
-    assert "unknown category 'wizardry'" in result.errors[0][1]
+    assert "unknown category" in result.errors[0][1]
+    # Spec (Req 10.3): validation errors must not echo the invalid value back.
+    assert "wizardry" not in result.errors[0][1]
+
+
+def test_named_levels_map_to_numeric_scale():
+    result = parse_skills_csv(
+        "username,skill,level,aspiration_level\n"
+        "alice,Python,Beginner,EXPERT\n"
+        "bob,Go,intermediate,\n"
+        "carol,Rust,none,advanced\n"
+    )
+    assert result.errors == []
+    assert [(r.level, r.aspiration_level) for r in result.rows] == [(1, 5), (3, None), (0, 4)]
 
 
 def test_duplicate_user_skill_rows_are_reported():

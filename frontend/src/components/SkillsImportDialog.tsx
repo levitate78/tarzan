@@ -84,7 +84,8 @@ export function SkillsImportDialog({ open, onClose }: { open: boolean; onClose: 
           <Typography variant="body2" color="text.secondary">
             Upload a CSV with a header row of{" "}
             <code>username,skill,level,aspiration_level,category</code>.{" "}
-            <code>aspiration_level</code> and <code>category</code> are optional; levels are 0–5.
+            <code>aspiration_level</code> and <code>category</code> are optional; levels are 0–5 or
+            names (None, Beginner, Elementary, Intermediate, Advanced, Expert).
             Skills not yet in the catalogue are created when a category is given. Existing levels
             for the same member and skill are updated, so re-importing a corrected file is safe.{" "}
             <Link component="button" type="button" onClick={downloadTemplate}>
