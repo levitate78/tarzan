@@ -22,6 +22,8 @@ import Typography from "@mui/material/Typography";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import UploadFileIcon from "@mui/icons-material/UploadFile";
+import { SkillsImportDialog } from "../components/SkillsImportDialog";
 import { useCreateSkill, useDeleteSkill, useSkills, useUpdateSkill } from "../api/hooks";
 import { extractErrorMessage } from "../api/client";
 import type { SkillCategory, SkillCreate, SkillResponse } from "../api/types";
@@ -110,6 +112,7 @@ export function SkillsAdminPage() {
   const deleteSkill = useDeleteSkill();
   const [editing, setEditing] = useState<SkillResponse | null>(null);
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const updateSkill = useUpdateSkill(editing?.id ?? "");
 
@@ -129,9 +132,14 @@ export function SkillsAdminPage() {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <Typography variant="h4">Skill Catalogue</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>
-          Add skill
-        </Button>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button variant="outlined" startIcon={<UploadFileIcon />} onClick={() => setImporting(true)}>
+            Import CSV
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreating(true)}>
+            Add skill
+          </Button>
+        </Box>
       </Box>
       <Typography variant="body2" color="text.secondary">
         The canonical list of skills used across the team skills matrix and individual profiles.
@@ -179,6 +187,8 @@ export function SkillsAdminPage() {
       </Paper>
 
       {deleteSkill.isError && <Alert severity="error">{extractErrorMessage(deleteSkill.error)}</Alert>}
+
+      <SkillsImportDialog open={importing} onClose={() => setImporting(false)} />
 
       <SkillFormDialog
         open={creating}

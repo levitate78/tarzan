@@ -26,6 +26,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
 from app.api.v1 import auth, config, dashboard, issues, merge_requests, skills, users
+from app import skills_import
 from app.config import get_settings
 from app.database import Base, engine
 
@@ -171,6 +172,7 @@ PREFIX = settings.API_V1_PREFIX
 app.include_router(auth.router, prefix=PREFIX)
 app.include_router(users.router, prefix=PREFIX)
 app.include_router(skills.router, prefix=PREFIX)
+app.include_router(skills_import.router, prefix=PREFIX)
 app.include_router(issues.router, prefix=PREFIX)
 app.include_router(merge_requests.router, prefix=PREFIX)
 app.include_router(dashboard.router, prefix=PREFIX)

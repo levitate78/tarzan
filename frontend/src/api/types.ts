@@ -62,6 +62,24 @@ export interface SkillLevelSet {
   aspiration_level?: number | null;
 }
 
+export interface SkillsImportRequest {
+  csv_content: string;
+}
+
+export interface SkillsImportRowError {
+  line: number;
+  message: string;
+}
+
+export interface SkillsImportResult {
+  total_rows: number;
+  imported_rows: number;
+  skills_created: number;
+  levels_created: number;
+  levels_updated: number;
+  errors: SkillsImportRowError[];
+}
+
 export interface TeamSkillsMatrix {
   skill: SkillResponse;
   member_count: number;

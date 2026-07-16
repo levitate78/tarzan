@@ -141,6 +141,35 @@ profile needs:
 
 These can be set on **My Profile**, or by an admin via **Team**.
 
+## Bulk importing skill levels
+
+Admins can bulk import team member skill levels from a CSV file via
+**Skill Catalogue → Import CSV** (or `POST /api/v1/skills/import`). The CSV
+needs a header row; column order is free and header names are
+case-insensitive:
+
+```csv
+username,skill,level,aspiration_level,category
+alice,Python,4,5,languages
+bob,Terraform,2,,devops
+```
+
+- `username` — the member's Tarzan username.
+- `skill` — matched case-insensitively against the skill catalogue. If the
+  skill doesn't exist yet and a `category` is provided, it is created;
+  otherwise the row is reported as an error.
+- `level` — 0–5 (0=None … 5=Expert).
+- `aspiration_level` *(optional)* — 0–5, may be left blank.
+- `category` *(optional)* — one of `languages`, `frameworks`, `cloud`,
+  `databases`, `devops`, `testing`, `soft_skills`, `other`; only used when
+  creating a missing skill.
+
+Existing levels for the same member and skill are updated in place, so
+re-importing a corrected file is idempotent. Valid rows are applied even if
+other rows fail — the response (and the UI) reports skipped rows with their
+line numbers so they can be fixed and re-imported. Imports are limited to
+5000 rows / 1 MB per request and are recorded in the audit log.
+
 ## Roles & permissions
 
 | Role     | Can do |
