@@ -22,6 +22,7 @@ def test_app_imports_and_exposes_expected_routes():
     assert "/api/v1/issues/{issue_id}/reassign" in paths
     assert "/api/v1/merge-requests" in paths
     assert "/api/v1/skills/matrix" in paths
+    assert "/api/v1/skills/import" in paths
     assert "/api/v1/config/connectors" in paths
     assert "/api/v1/config/review-threshold" in paths
 

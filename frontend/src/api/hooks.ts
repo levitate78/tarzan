@@ -14,6 +14,8 @@ import type {
   SkillLevelResponse,
   SkillLevelSet,
   SkillResponse,
+  SkillsImportRequest,
+  SkillsImportResult,
   TeamDashboard,
   TeamSkillsMatrix,
   UserCreate,
@@ -158,6 +160,20 @@ export function useDeleteSkill() {
       await apiClient.delete(`/skills/${skillId}`);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["skills"] }),
+  });
+}
+
+export function useImportSkillLevels() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: SkillsImportRequest) =>
+      (await apiClient.post<SkillsImportResult>("/skills/import", body)).data,
+    onSuccess: () => {
+      // Imports touch the catalogue, member profiles, and matrix aggregates.
+      qc.invalidateQueries({ queryKey: ["skills"] });
+      qc.invalidateQueries({ queryKey: ["users"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
   });
 }
 

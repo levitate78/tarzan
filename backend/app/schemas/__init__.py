@@ -109,6 +109,26 @@ class TeamSkillsMatrix(BaseModel):
     distribution: dict[str, int]
 
 
+class SkillsImportRequest(BaseModel):
+    """CSV content for the bulk skill-level import (see app.skills_csv)."""
+
+    csv_content: str = Field(..., min_length=1, max_length=1_000_000)
+
+
+class SkillsImportRowError(BaseModel):
+    line: int
+    message: str
+
+
+class SkillsImportResult(BaseModel):
+    total_rows: int
+    imported_rows: int
+    skills_created: int
+    levels_created: int
+    levels_updated: int
+    errors: list[SkillsImportRowError] = []
+
+
 # ── Users ──────────────────────────────────────────────────────────────────────
 
 class UserCreate(BaseModel):

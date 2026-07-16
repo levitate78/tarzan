@@ -144,6 +144,36 @@ components:
           description: Count of members at each level (0-5)
           additionalProperties: { type: integer }
 
+    SkillsImportRequest:
+      type: object
+      required: [csv_content]
+      properties:
+        csv_content:
+          type: string
+          minLength: 1
+          maxLength: 1000000
+          description: |
+            Raw CSV text. Header row required:
+            username,skill,level[,aspiration_level][,category]
+
+    SkillsImportRowError:
+      type: object
+      properties:
+        line: { type: integer, description: 1-based line number in the CSV }
+        message: { type: string }
+
+    SkillsImportResult:
+      type: object
+      properties:
+        total_rows: { type: integer, description: Data rows found in the CSV }
+        imported_rows: { type: integer, description: Rows applied }
+        skills_created: { type: integer }
+        levels_created: { type: integer }
+        levels_updated: { type: integer }
+        errors:
+          type: array
+          items: { $ref: '#/components/schemas/SkillsImportRowError' }
+
     # ── Jira Issues ───────────────────────────────────────────────────────────
     IssueStatus:
       type: string
@@ -461,6 +491,34 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SkillResponse' }
+
+  /skills/import:
+    post:
+      tags: [Skills]
+      summary: Bulk import team member skill levels from CSV (admin only)
+      description: |
+        Accepts CSV content with a header row of
+        `username,skill,level[,aspiration_level][,category]`. Levels are
+        integers 0-5 or named levels (none, beginner, elementary,
+        intermediate, advanced, expert, case-insensitive). Skill names are
+        matched case-insensitively against the catalogue; a missing skill is
+        created when the row supplies a `category`. Existing (user, skill)
+        levels are updated in place, so re-importing the same file is
+        idempotent. Valid rows are applied; invalid rows are skipped and
+        reported per line in `errors`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SkillsImportRequest' }
+      responses:
+        200:
+          description: Import summary
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SkillsImportResult' }
+        400:
+          description: Structurally invalid CSV (empty, or bad header row)
 
   /skills/matrix:
     get:
